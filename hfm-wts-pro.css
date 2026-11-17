@@ -1,0 +1,44 @@
+/* HFM KOREA / Korean securities WTS layout refresh: original independent design */
+:root{--navy:#142e52;--primary:#285cbd;--primary-dark:#1a4089;--primary-light:#eaf0fd;--bg:#eef2f8;--surface:#fff;--surface2:#f5f7fb;--border:#dce3ed;--text:#162b4b;--sub:#71819a;--soft:#9aa8bb;--shadow:none}
+body{font-family:"Malgun Gothic","Apple SD Gothic Neo",Arial,sans-serif;font-size:13px}
+.global-header{height:54px;position:relative;top:auto;padding:0 18px;background:#fff;box-shadow:none;border-bottom:1px solid #e3e9f1}
+.header-brand{gap:9px}.header-brand .mark{border-radius:50%;width:31px;height:31px;font-size:16px;letter-spacing:-2px;box-shadow:none;background:#173d70}.header-brand strong{font-size:14px;letter-spacing:-.3px}.header-brand small{font-size:8px;color:#7891b5;letter-spacing:1px}.service-title,.header-divider{display:none}
+.notice-strip{min-height:0!important;height:0!important;padding:0!important;overflow:hidden!important;border:0!important}
+.shell{display:grid;grid-template-columns:minmax(0,1fr) 228px;grid-template-rows:43px minmax(0,1fr);min-height:calc(100vh - 54px);gap:0}
+.sidebar{grid-column:1/-1;grid-row:1;position:relative;transform:none;display:flex;flex-direction:row;gap:0;padding:0 12px;align-items:stretch;width:100%;height:43px;overflow:auto hidden;box-shadow:none;border-right:0;border-bottom:1px solid #dce3ed;background:#fff;scrollbar-width:thin}
+.sidebar .nav-section,.sidebar .sidebar-bottom{display:none!important}
+.sidebar .nav-item{width:auto;min-width:max-content;border-radius:0;padding:0 14px;gap:0;font-size:12px;border-bottom:2px solid transparent;color:#455773}
+.sidebar .nav-item span:first-child,.sidebar .chev{display:none}
+.sidebar .nav-item.selected{background:#fff;color:#1f56b4;border-left:0;border-bottom-color:#2760c4;font-weight:800}
+.sidebar .nav-item:hover{background:#f7f9fe;color:#1f56b4}
+.main-panel{grid-column:1;grid-row:2;padding:10px 10px 16px;min-width:0;background:#f4f6fa;overflow:visible}
+.watchlist{grid-column:2;grid-row:2;background:#fff;border-left:1px solid #dce3ed;padding:10px 9px;min-width:0;display:flex;flex-direction:column;gap:5px}
+.watchlist-head{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:800;padding:9px 5px 13px;color:#243c64;border-bottom:1px solid #e2e8f1}
+.watchlist-sub{font-size:10px;color:#8290a6;padding:7px 5px}
+.watch-btn{background:transparent;border:0;border-bottom:1px solid #f0f3f7;display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 7px;text-align:left;font-weight:650;color:#253b5f;font-size:12px}
+.watch-btn:hover,.watch-btn.selected{background:#eaf1fe;color:#215cc3}
+.watch-btn small{font-weight:400;color:#8795aa;font-size:10px}
+.watch-group{padding:10px 6px 5px;font-weight:800;color:#4265a1;font-size:11px}
+.page-head{margin:0 0 8px;min-height:30px}.page-title{font-size:16px;font-weight:800}.page-sub{font-size:11px;margin-top:2px}
+.panel{border:1px solid #dce3ed;border-radius:5px;box-shadow:none}
+.trade-header{padding:10px 13px;margin-bottom:7px;min-height:59px}.instrument-name{font-size:16px}.symbol-code{font-size:10px}.price-display{font-size:23px}
+.market-stats{font-size:11px}.market-stats b{font-size:12px}
+.trading-layout{display:grid;grid-template-columns:minmax(340px,1fr) minmax(160px,21%) minmax(225px,25%);gap:5px;align-items:stretch}
+.chart-panel{min-height:545px}.chart-header{padding:8px 9px}.chart-wrap{min-height:415px;padding:1px}.chart-legend{padding:8px}
+.orderbook-panel{min-height:545px}.order-panel{min-height:545px}
+.panel-head{padding:9px 10px}.panel-title{font-size:12px}.order-body{padding:11px}.book-head{padding:10px 5px}
+.order-info{padding:9px}.bottom-panel{margin-top:5px;min-height:170px}.tabbar{gap:19px}.tabbar button{padding:10px 0}
+.btn{border-radius:4px}.field{border-radius:4px;background:#f7f9fd}.segment button{border-radius:3px}
+.auth-wrap{grid-template-columns:minmax(0,1fr) 460px;background:#fff}
+.auth-feature{background:#fff;color:#172f55;align-items:center;justify-content:center;text-align:center;border-right:0;padding:40px 5vw}
+.auth-feature:after{display:none}.auth-feature .mark{background:#173d70}.auth-feature .feature-bar{font-size:24px;font-weight:900;justify-content:center}.auth-feature .auth-copy h1{color:#183f73;font-size:26px;font-weight:700;line-height:1.55}.auth-feature .eyebrow{color:#597aa8}.auth-feature .auth-copy p{color:#617899}.auth-feature .feature-list{color:#41628f}.auth-feature .feature-foot{color:#a3b0c3}
+.auth-side{background:#f1f4f9;padding:30px;display:flex;align-items:center;justify-content:center}
+.auth-box{background:#fff;border:1px solid #dae3f1;border-radius:16px;box-shadow:0 15px 38px #1e3b7020;padding:35px 30px;max-width:420px}
+.auth-brand{margin-bottom:22px}.auth-brand .mark{background:#173d70;border-radius:50%}
+.auth-box h2{font-weight:500;font-size:27px;letter-spacing:2px;color:#254e96}
+.form-stack label{font-size:12px;color:#344c70}.form-stack input{background:#f4f6fa;border-color:#d9e1ec;border-radius:5px}
+.form-stack button.btn-primary{background:#285dbd;border-radius:6px}
+@media(max-width:1440px){.shell{grid-template-columns:minmax(0,1fr) 198px}.trading-layout{grid-template-columns:minmax(290px,1fr) minmax(165px,22%) minmax(225px,26%)}.sidebar .nav-item{padding:0 10px}}
+@media(max-width:1190px){.watchlist{display:none}.shell{grid-template-columns:minmax(0,1fr)}.trading-layout{grid-template-columns:minmax(370px,1fr) 230px}.order-panel{grid-column:1/-1;min-height:auto}.chart-panel,.orderbook-panel{min-height:450px}.order-body{display:grid;grid-template-columns:1fr 1fr 1fr}.order-body>.order-fields{grid-column:1}.order-info{grid-column:2}.trade-buttons{grid-column:3}.trade-footer{grid-column:1/-1}}
+@media(max-width:860px){.sidebar{position:relative;top:auto;left:auto;bottom:auto;transform:none!important;width:100%;box-shadow:none;z-index:1}.mobile-visible{display:none!important}.shell{display:grid;grid-template-columns:1fr;grid-template-rows:43px minmax(0,1fr)}.main-panel{grid-column:1;grid-row:2}.global-header{padding:0 10px}.auth-wrap{grid-template-columns:1fr}.auth-feature{display:none}.auth-side{min-height:100vh}.auth-box{width:min(460px,100%)}}
+@media(max-width:680px){.trading-layout{grid-template-columns:1fr}.chart-panel,.orderbook-panel,.order-panel{grid-column:1}.chart-panel{min-height:390px}.chart-wrap{min-height:290px}.orderbook-panel{min-height:auto}.order-body{grid-template-columns:1fr 1fr}.order-fields{grid-column:1}.order-info{grid-column:2}.trade-buttons{grid-column:1/-1}.main-panel{padding:7px}.sidebar .nav-item{padding:0 12px}.global-header{height:52px}}
