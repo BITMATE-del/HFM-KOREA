@@ -1,0 +1,41 @@
+name: Apply NQ PnL benchmark v1.0.46 once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-nq-pnl-v46-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply NQ benchmark to WTS MTS and release version
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          old="{symbol:'NQU26',code:'NQ',name:'E-mini Nasdaq100',exchange:'CME',month:'202609',tick:.25,tickValue:6290}"
+          new="{symbol:'NQU26',code:'NQ',name:'E-mini Nasdaq100',exchange:'CME',month:'202609',tick:.25,tickValue:6847.5}"
+          if old not in s:
+              if new not in s:
+                  raise SystemExit('WTS/MTS NQ tickValue anchor missing')
+          else:
+              s=s.replace(old,new,1)
+              p.write_text(s,encoding='utf-8')
+          Path('desktop/RELEASE').write_text('1.0.46\n',encoding='utf-8')
+          pnl=(29220.75-29225.00)/0.25*6847.5*10
+          if round(pnl)!=-1164075:
+              raise SystemExit(f'benchmark mismatch: {pnl}')
+          print('benchmark verified:', round(pnl))
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html desktop/RELEASE
+          git commit -m 'Apply NQ PnL benchmark to WTS MTS and release v1.0.46' || exit 0
+          git push
