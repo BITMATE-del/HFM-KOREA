@@ -103,6 +103,24 @@ async function checkMassive(){
    Responses deliberately carry source and timestamp for freshness checks. */
 const stockCache=new Map(), stockPending=new Map();
 const STOCK_CODE=/^[0-9]{6}$/;
+let stockCatalogCache=null,stockCatalogPending=null;
+async function stockCatalog(q){
+ if(!stockCatalogCache||Date.now()-stockCatalogCache.at>3600000){
+  if(!stockCatalogPending)stockCatalogPending=(async()=>{
+   const raw=await stockHttp("https://aikstockdata.com/data/public/quotes.json");
+   const rows=Array.isArray(raw?.items)?raw.items:[];
+   const symbols=rows.map(row=>({code:String(row["종목코드"]||"").padStart(6,"0"),name:String(row["종목명"]||""),market:String(row.mrktCtg||"")}))
+    .filter(x=>STOCK_CODE.test(x.code)&&x.name.length>0&&x.name.length<100&&["KOSPI","KOSDAQ"].includes(x.market));
+   if(symbols.length<1000)throw Error("STOCK_CATALOG_INCOMPLETE");
+   stockCatalogCache={at:Date.now(),items:symbols};return symbols;
+  })().finally(()=>{stockCatalogPending=null});
+  await stockCatalogPending;
+ }
+ const query=String(q||"").trim().toLowerCase().slice(0,60);
+ const matching=query?stockCatalogCache.items.filter(x=>(x.code+" "+x.name).toLowerCase().includes(query)):stockCatalogCache.items;
+ return {source:"PUBLIC_DIRECTORY",quoteAvailable:false,total:matching.length,items:matching.slice(0,40)};
+}
+
 function stockNumber(v){const n=Number(String(v??"").replace(/,/g,""));return Number.isFinite(n)?n:NaN}
 async function stockCached(key,age,load){
  const old=stockCache.get(key);if(old&&Date.now()-old.at<age)return old.value;
@@ -188,6 +206,11 @@ const host="0.0.0.0",port=Number(process.env.PORT||3000);
 http.createServer(async (req,res)=>{
  try{
   const url=new URL(req.url,"http://localhost");
+  if(url.pathname==="/api/stocks/catalog"){
+   if(req.method!=="GET")return jsonResponse(res,405,{error:"METHOD_NOT_ALLOWED"});
+   try{return jsonResponse(res,200,await stockCatalog(url.searchParams.get("q")||""))}
+   catch(e){console.warn("STOCK_CATALOG_ERROR",String(e.message).slice(0,55));return jsonResponse(res,503,{error:"STOCK_CATALOG_UNAVAILABLE"})}
+  }
   if(url.pathname==="/api/stocks/quote"||url.pathname==="/api/stocks/intraday"){
    if(req.method!=="GET")return jsonResponse(res,405,{error:"METHOD_NOT_ALLOWED"});
    const symbol=url.searchParams.get("symbol")||"";
