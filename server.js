@@ -97,10 +97,111 @@ async function checkMassive(){
  const result=await massiveFetch("/futures/v1/contracts",{product_code:"NQ",limit:"1"});
  return publicDiagnostic(result.code,{connected:result.ok,checkedAt:new Date().toISOString(),...(result.retryAfter?{retryAfter:result.retryAfter}:{})});
 }
+
+/* Domestic stocks: independent read-only port of HFM margin quote/chart adapters.
+   NAVER unofficial quote and sampled 1-minute chart; no account/trade/DB access.
+   Responses deliberately carry source and timestamp for freshness checks. */
+const stockCache=new Map(), stockPending=new Map();
+const STOCK_CODE=/^[0-9]{6}$/;
+function stockNumber(v){const n=Number(String(v??"").replace(/,/g,""));return Number.isFinite(n)?n:NaN}
+async function stockCached(key,age,load){
+ const old=stockCache.get(key);if(old&&Date.now()-old.at<age)return old.value;
+ if(stockPending.has(key))return stockPending.get(key);
+ const job=(async()=>{const value=await load();stockCache.set(key,{at:Date.now(),value});if(stockCache.size>90){const k=stockCache.keys().next().value;stockCache.delete(k)}return value})().finally(()=>stockPending.delete(key));
+ stockPending.set(key,job);return job;
+}
+async function stockHttp(url,accept="application/json"){
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),7800);
+ try{
+  const response=await fetch(url,{headers:{"Accept":accept,"User-Agent":"Mozilla/5.0 (compatible; HFMKoreaFutures/1.0)"},signal:controller.signal});
+  if(!response.ok)throw Error("STOCK_UPSTREAM_HTTP_"+response.status);
+  return accept==="application/json"?response.json():response.text();
+ }finally{clearTimeout(timer)}
+}
+function stockMarketOpen(){
+ const d=new Date(Date.now()+9*3600000),day=d.getUTCDay(),minute=d.getUTCHours()*60+d.getUTCMinutes();
+ return day>=1&&day<=5&&minute>=540&&minute<930;
+}
+async function stockQuote(code){
+ return stockCached("q:"+code,12000,async()=>{
+  let row,price,previousClose,rawTime="";
+  try{
+   const response=await stockHttp("https://polling.finance.naver.com/api/realtime/domestic/stock/"+code);
+   row=response?.datas?.find(x=>x.itemCode===code);
+   if(!row)throw Error("QUOTE_NOT_FOUND");
+   price=stockNumber(row.closePrice);previousClose=price-stockNumber(row.compareToPreviousClosePrice);
+   rawTime=String(row.localTradedAt||"");
+  }catch{
+   const response=await stockHttp("https://polling.finance.naver.com/api/realtime?query="+encodeURIComponent("SERVICE_ITEM:"+code));
+   row=response?.result?.areas?.flatMap(x=>x.datas||[]).find(x=>String(x.cd)===code);
+   if(!row)throw Error("QUOTE_NOT_FOUND");
+   price=stockNumber(row.nv);previousClose=stockNumber(row.sv);
+   if(!(previousClose>0))previousClose=price-stockNumber(row.cv);
+   rawTime=String(row.localTradedAt||row.tradedAt||"");
+  }
+  if(!Number.isSafeInteger(price)||price<=0||!Number.isSafeInteger(previousClose)||previousClose<=0)throw Error("QUOTE_INVALID");
+  const ts=Date.parse(rawTime);
+  return {symbol:code,price,previousClose,change:price-previousClose,rate:(price-previousClose)/previousClose*100,
+   asOf:Number.isFinite(ts)?new Date(ts).toISOString():null,marketStatus:stockMarketOpen()?"REGULAR_SESSION":"CLOSED",
+   source:"NAVER_UNOFFICIAL",tradeable:false};
+ });
+}
+async function stockCandles(code,period){
+ const sizes={minute1:1,minute5:5,minute15:15,minute60:60,day:0,week:0,month:0};
+ if(!Object.prototype.hasOwnProperty.call(sizes,period))throw Error("INVALID_PERIOD");
+ const size=sizes[period];
+ return stockCached("c:"+code+":"+period,size?45000:300000,async()=>{
+  if(!size){
+   const timeframe=period==="day"?"day":period==="week"?"week":"month";
+   const xml=await stockHttp("https://fchart.stock.naver.com/sise.nhn?symbol="+code+"&timeframe="+timeframe+"&count=1500&requestType=0","application/xml");
+   const bars=[];
+   for(const m of xml.matchAll(/<item\s+data="([0-9]{8}\|[^"]+)"\s*\/>/g)){
+    const a=m[1].split("|");if(a.length<6)continue;
+    const [date,open,high,low,close,volume]=[a[0],...a.slice(1,6).map(stockNumber)];
+    if(!(open>0&&high>=Math.max(open,close)&&low<=Math.min(open,close)&&volume>=0))continue;
+    bars.push({time:date.slice(0,4)+"-"+date.slice(4,6)+"-"+date.slice(6,8),open,high,low,close,volume});
+   }
+   if(!bars.length)throw Error("STOCK_CHART_EMPTY");
+   return {symbol:code,period,source:"NAVER_DAILY_UNOFFICIAL",approximateOHLC:false,candles:bars.slice(-1200),asOf:new Date().toISOString()};
+  }
+  const xml=await stockHttp("https://fchart.stock.naver.com/sise.nhn?symbol="+code+"&timeframe=minute&count=3000&requestType=0","application/xml");
+  const bars=[];let lastDay="",priorAccum=0,prevPrice=0;
+  for(const m of xml.matchAll(/<item\s+data="([0-9]{12}\|[^"]+)"\s*\/>/g)){
+   const a=m[1].split("|"),d=a[0],price=stockNumber(a[4]),acc=stockNumber(a[5]);
+   if(!/^\d{12}$/.test(d)||!Number.isSafeInteger(price)||price<=0||!Number.isFinite(acc))continue;
+   const day=d.slice(0,8),min=Number(d.slice(8,10))*60+Number(d.slice(10,12));
+   const bucket=Math.floor(min/size)*size;
+   const time=Math.floor((Date.UTC(Number(day.slice(0,4)),Number(day.slice(4,6))-1,Number(day.slice(6,8)),0,bucket)-32400000)/1000);
+   const sameDay=day===lastDay,volume=sameDay?Math.max(0,acc-priorAccum):Math.max(0,acc);
+   if(!sameDay)prevPrice=0;
+   lastDay=day;priorAccum=acc;
+   const open=sameDay&&prevPrice>0?prevPrice:price;prevPrice=price;
+   const previous=bars[bars.length-1];
+   if(previous&&previous.time===time){previous.high=Math.max(previous.high,price);previous.low=Math.min(previous.low,price);previous.close=price;previous.volume+=volume}
+   else bars.push({time,open,high:Math.max(open,price),low:Math.min(open,price),close:price,volume});
+  }
+  if(!bars.length)throw Error("STOCK_CHART_EMPTY");
+  return {symbol:code,period,source:"NAVER_MINUTE_LAST_PRICE",approximateOHLC:true,candles:bars.slice(-1200),asOf:new Date().toISOString()};
+ });
+}
 const host="0.0.0.0",port=Number(process.env.PORT||3000);
 http.createServer(async (req,res)=>{
  try{
   const url=new URL(req.url,"http://localhost");
+  if(url.pathname==="/api/stocks/quote"||url.pathname==="/api/stocks/intraday"){
+   if(req.method!=="GET")return jsonResponse(res,405,{error:"METHOD_NOT_ALLOWED"});
+   const symbol=url.searchParams.get("symbol")||"";
+   if(!STOCK_CODE.test(symbol))return jsonResponse(res,400,{error:"INVALID_SYMBOL"});
+   const period=url.searchParams.get("period")||"minute1";
+   if(url.pathname.endsWith("/intraday")&&!["minute1","minute5","minute15","minute60","day","week","month"].includes(period))return jsonResponse(res,400,{error:"INVALID_PERIOD"});
+   try{
+    const output=url.pathname.endsWith("/quote")?await stockQuote(symbol):await stockCandles(symbol,period);
+    return jsonResponse(res,200,output);
+   }catch(e){
+    console.warn("STOCK_FEED_ERROR",{kind:url.pathname.endsWith("/quote")?"quote":"chart",symbol,reason:String(e.message||"UNAVAILABLE").slice(0,55)});
+    return jsonResponse(res,503,{error:"STOCK_DATA_UNAVAILABLE",symbol});
+   }
+  }
   if(url.pathname==="/api/futures/provider-status"){
    if(req.method!=="GET")return jsonResponse(res,405,{ok:false,code:"METHOD_NOT_ALLOWED"});
    const status=await checkMassive();
