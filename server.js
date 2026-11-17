@@ -127,4 +127,4 @@ http.createServer(async (req,res)=>{
   res.writeHead(200,{"Content-Type":mime[ext],"X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"strict-origin-when-cross-origin","Cache-Control":ext===".html"?"no-cache":"public, max-age=300"});
   fs.createReadStream(filepath).pipe(res)
  }catch(err){res.writeHead(400);res.end("Bad Request")}
-}).listen(port,host,()=>console.log("HFM KOREA Futures web listening on "+port));
+}).listen(port,host,()=>{console.log("HFM KOREA Futures web listening on "+port);setTimeout(()=>checkMassive().then(s=>console.log("MASSIVE_CONNECTIVITY",JSON.stringify({code:s.code,connected:s.connected||false,checkedAt:s.checkedAt}))).catch(()=>console.log("MASSIVE_CONNECTIVITY",JSON.stringify({code:"PROBE_FAILED",connected:false}))),1200)});
