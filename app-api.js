@@ -62,7 +62,7 @@ async function route(req,res,url){
   await ensureReady();
   const m=req.method,origin=req.headers.origin;
   if(m!=="GET"&&origin&&new URL(origin).host!==req.headers.host){send(res,403,{error:"ORIGIN_MISMATCH"});return true}
-  const b=m==="GET"?{}:await bodyOf(req);
+  const b=m==="GET"||m==="DELETE"?{}:await bodyOf(req);
   if(p==="/api/auth/register"&&m==="POST"){
    const id=String(b.id||"").toLowerCase(),pwd=String(b.password||""),name=String(b.name||"").trim(),phone=String(b.phone||"").replace(/[-\s]/g,""),ref=String(b.referral||"").trim();
    if(!/^[a-z0-9_]{4,32}$/.test(id)||pwd.length<10||pwd.length>128||name.length<2||name.length>80||!/^(?:010\d{8}|01[16789]\d{7,8})$/.test(phone)||ref.length>40){send(res,400,{error:"INVALID_REGISTRATION"});return true}
