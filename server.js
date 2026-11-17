@@ -243,7 +243,7 @@ http.createServer(async (req,res)=>{
     ok:status.code==="OK",stage,...status
    });
   }
-  const p=url.pathname==="/health"?"/api/health.js":url.pathname==="/"?"/index.html":url.pathname;
+  const p=url.pathname==="/health"?"/health":url.pathname==="/"?"/index.html":url.pathname;
   let filepath=path.resolve(root,"."+decodeURIComponent(p));
   if(!filepath.startsWith(root+path.sep)){res.writeHead(403);return res.end("Forbidden")}
   if(p==="/health"){res.writeHead(200,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"});return res.end(JSON.stringify({ok:true,service:"hfm-futures-web"}))}
