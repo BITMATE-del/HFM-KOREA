@@ -1,0 +1,2 @@
+/* Korean stocks live read-only feed: distinguish source from simulated orderbook */
+#platform .stock-orderbook-empty{min-height:220px;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px 12px;font-size:12px;color:#8795ab;background:#fbfcff;border-bottom:1px solid #e6ebf2}
