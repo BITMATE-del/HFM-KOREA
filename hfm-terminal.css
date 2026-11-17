@@ -178,3 +178,11 @@ button,input,select,textarea{font-family:inherit!important}
 @media(max-width:1510px){#platform .shell{grid-template-columns:minmax(0,1fr) 215px!important}#platform .shell>.watchlist{width:215px!important;max-width:215px!important}#platform .shell>#sidebar.sidebar>.nav-item{padding:0 11px!important}}
 @media(max-width:1180px){#platform .shell{grid-template-columns:minmax(0,1fr)!important}#platform .shell>.watchlist{display:none!important}}
 @media(max-width:870px){#platform .shell{grid-template-rows:48px minmax(0,1fr)!important}#platform .shell>#sidebar.sidebar{height:48px!important;min-height:48px!important;max-height:48px!important;padding:0 6px!important}#platform .shell>#sidebar.sidebar>.nav-item{height:48px!important;min-height:48px!important;max-height:48px!important;padding:0 12px!important}}
+
+/* Header tools — neutral matching line icons, no ornamental emoji/dots */
+#platform .header-right .header-tool-btn{appearance:none!important;-webkit-appearance:none!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;flex:none!important;width:35px!important;height:35px!important;min-height:35px!important;padding:0!important;border:1px solid #e1e7ef!important;border-radius:8px!important;background:#fff!important;color:#405b80!important;box-shadow:none!important;line-height:1!important;position:relative!important;transition:background-color .15s,color .15s,border-color .15s!important}
+#platform .header-right .header-tool-btn:hover{background:#f2f6fd!important;color:#1e52a8!important;border-color:#c8d7ee!important}
+#platform .header-right .header-tool-btn:focus-visible{outline:2px solid #6792dc!important;outline-offset:2px!important}
+#platform .header-right .header-tool-btn svg{width:18px!important;height:18px!important;display:block!important;flex:none!important;stroke-width:1.8!important}
+#platform .header-right .header-tool-btn .dot{display:none!important}
+@media(max-width:650px){#platform .header-right .header-tool-btn{width:33px!important;height:33px!important;min-height:33px!important}}
