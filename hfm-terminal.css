@@ -144,3 +144,4 @@ button,input,select,textarea{font-family:inherit!important}
 .feature-list .feature-chip>span{font-size:11px;color:#48658c}
 @media(max-width:1180px){.auth-copy h1.auth-headline{font-size:clamp(25px,2.65vw,38px)!important;letter-spacing:-1.6px!important}}
 @media(max-width:870px){.auth-copy h1.auth-headline{font-size:clamp(24px,5vw,39px)!important}.feature-list .feature-chip{padding:9px 11px!important}}
+.feature-list .feature-chip>span{display:inline!important;border:0!important;background:none!important;box-shadow:none!important;padding:0!important;margin:0!important;border-radius:0!important;white-space:nowrap!important;font-size:11px!important;color:#48658c!important}
