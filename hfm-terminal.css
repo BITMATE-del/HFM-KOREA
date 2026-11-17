@@ -145,3 +145,14 @@ button,input,select,textarea{font-family:inherit!important}
 @media(max-width:1180px){.auth-copy h1.auth-headline{font-size:clamp(25px,2.65vw,38px)!important;letter-spacing:-1.6px!important}}
 @media(max-width:870px){.auth-copy h1.auth-headline{font-size:clamp(24px,5vw,39px)!important}.feature-list .feature-chip{padding:9px 11px!important}}
 .feature-list .feature-chip>span{display:inline!important;border:0!important;background:none!important;box-shadow:none!important;padding:0!important;margin:0!important;border-radius:0!important;white-space:nowrap!important;font-size:11px!important;color:#48658c!important}
+
+/* Corrected auth typography and single-outline feature pills */
+.auth-feature .auth-copy{width:100%!important;max-width:100%!important;min-width:0!important}
+.auth-feature .auth-copy h1.auth-headline{display:block!important;font-size:clamp(29px,2.65vw,43px)!important;line-height:1.30!important;letter-spacing:-1.65px!important;word-break:keep-all!important;overflow-wrap:normal!important;white-space:normal!important;margin:19px 0 24px!important}
+.auth-feature .auth-copy h1.auth-headline .headline-row{display:block!important;width:max-content!important;max-width:none!important;white-space:nowrap!important;word-break:keep-all!important;overflow-wrap:normal!important}
+.auth-feature .feature-list{display:flex!important;flex-wrap:wrap!important;gap:10px!important;align-items:center!important}
+.auth-feature .feature-list .feature-chip{display:inline-flex!important;flex:none!important;align-items:center!important;gap:9px!important;border:1px solid #dce5ef!important;background:rgba(255,255,255,.9)!important;border-radius:7px!important;padding:11px 14px!important;box-shadow:none!important;white-space:nowrap!important}
+.auth-feature .feature-list .feature-chip svg{width:16px!important;height:16px!important;flex:none!important;color:#275ba8!important}
+.auth-feature .feature-list .feature-chip strong.feature-label{display:inline!important;border:0!important;outline:0!important;box-shadow:none!important;background:transparent!important;padding:0!important;margin:0!important;border-radius:0!important;font-size:11px!important;color:#496584!important;font-weight:700!important;white-space:nowrap!important}
+@media(min-width:871px) and (max-width:1400px){.auth-feature .auth-copy h1.auth-headline{font-size:clamp(27px,2.55vw,36px)!important;letter-spacing:-1.6px!important}}
+@media(max-width:870px){.auth-feature .auth-copy h1.auth-headline{font-size:clamp(25px,5.5vw,39px)!important}}
