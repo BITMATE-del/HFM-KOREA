@@ -155,4 +155,4 @@ async function route(req,res,url){
   send(res,["INVALID_JSON","BODY_TOO_LARGE"].includes(message)?400:503,{error:["INVALID_JSON","BODY_TOO_LARGE"].includes(message)?message:"SERVICE_UNAVAILABLE"});return true;
  }
 }
-module.exports={route,ensureReady};
+module.exports={route,ensureReady,pool,auth,audit};
