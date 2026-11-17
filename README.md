@@ -1,36 +1,30 @@
-# HFM KOREA — 해외선물 전용 플랫폼
+# HFM KOREA — 해외선물 전용 WTS/HTS/MTS 프로젝트
 
-## 분리 원칙
-이 저장소는 **해외선물 WTS/HTS/MTS 전용**입니다. 기존 **HFM KOREA 마진/CFD** 저장소 `BITMATE-del/ai-autocall-crm`와 소스·회원·DB·배포를 섞지 않습니다.
+이 저장소는 **해외선물 전용**이며 기존 **HFM KOREA 마진/CFD** 프로젝트 `BITMATE-del/ai-autocall-crm`와 별개입니다.
 
-## 소스 출처
-- 원본 `dlxodnjs2456-hash/veltro`
-- 기준 커밋 `81acf3f7349467b94700b2def885ff6343b6620a` (2026-09-10)
-- 기존 거래 화면·주문·인증·지갑·모바일 및 HTS 패치 소스를 보존해 이전
-- 이전 GitHub Actions는 사고 방지를 위해 `legacy-workflows/`에 비활성 상태로 보관
-- `desktop/desktop_source.zip`은 원본 ZIP이 정상 압축파일로 열리지 않아 GitHub 이전 대상에서 제외. 원본 압축 백업에만 포함됨.
-- 시장 데이터 워커는 기존 VELTRO 환경 자동배포를 방지하기 위해 `render.yaml`에서 중단
+## 기준 소스
+- 기존 VELTRO: `dlxodnjs2456-hash/veltro`, 기준 커밋 `81acf3f`
+- 1차 VELTRO 소스 보존: WTS 관련 JS, HTS Python 패치/자산, Android 소스, 시세 브리지
+- 기존 배포 동작이 섞이지 않도록 예전 워크플로는 `legacy-workflows/`로 비활성화했습니다.
+- `render.yaml`에서 예전 시세 워커 자동 실행을 차단했습니다.
 
-## 1차 디자인 변경
-- `index.html`과 `hfm-futures-theme.css`: HFM KOREA 브랜드/화이트·네이비 기반 WTS 테마
-- `signup.html`: 브랜드 및 가입 폼 스타일
-- `admin.html`, `wallet.html`, `wallet-admin.html`: 브랜드 표기 변경
-- 기존 `index.html` 모바일 주문 확인 안내문의 JavaScript 문자열 줄바꿈 문법 오류 수정
-- 기존 API/체결/원장 SQL 및 DB 데이터는 변경하지 않음
+## 2026-11-17 추가 개편
+- `index.html`은 HTML+CSS+JavaScript가 자체 포함된 **HFM KOREA 해외선물 데모 WTS**입니다.
+- 로그인·회원가입 UI, PC/모바일 화면, 차트, 호가, 해외선물·국내주식, 데모 시장가/지정가 주문, 대기/취소/청산, 데모 지갑·이동, 주문내역·손익, 경제지표 안내, 고객센터·공지·계정관리·다크모드를 포함합니다.
+- `admin.html`은 **로컬 데모 내역만 조회**하는 관리자 시연용입니다.
+- 기존 `signup.html`, `mts.html`, `wallet.html`, `wallet-admin.html`, `download.html`은 새 UI 또는 안전 안내로 이동합니다.
 
-## 배포 전 차단 사항
-**아직 실운영 배포 금지.** HTML/JS에는 원래 VELTRO Supabase 프로젝트(`mzjkvakigwtlibwlslhq`) API 설정이 남아 있습니다. 이를 HFM 해외선물 전용 신규 환경으로 분리·인증·마이그레이션 검증하기 전 신규 사이트를 공개하면 안 됩니다.
+## 매우 중요: 데모와 실운영 구별
+**현재 파일은 UI/거래 시뮬레이션 완성본이지 실제 금융 거래 가능한 운영 완성본이 아닙니다.**
+- 실제 계정 로그인/회원가입/주문/은행 입출금 API는 **연결되어 있지 않습니다**.
+- 화면의 시세는 수학적 시뮬레이션 데이터이며 실시간 시장가가 아닙니다.
+- 데모 포지션, 체결, 잔고는 브라우저 `localStorage`에만 저장되며 실제 자금/주문이 아닙니다.
+- 기존 VELTRO Supabase 프로젝트 `mzjkvakigwtlibwlslhq`를 신규 HFM 운영 데이터베이스로 무단 재사용하지 않습니다.
+- 백엔드 별도 구축, 시장 데이터 검증, 멱등 정산/보안, HTS/MTS 앱 빌드 및 운영 검증 전에는 실제 고객 대상 거래 오픈 금지.
 
-또한 모바일 APK와 HTS 설치파일 다운로드 경로는 기존 VELTRO 릴리스를 참조합니다. 신규 브랜드 빌드 및 재검증이 완료되기 전까지 HFM KOREA 설치파일로 안내하지 마세요.
+## 정적 미리보기
+정적 호스팅 또는 `python -m http.server 8080` 이용 후 `index.html`에서 **데모 거래 시작** 클릭.
+관리자 시연은 `admin.html`에서 진행합니다. 로그인 서버가 없으므로 관리자 화면은 실운영 인증/권한 체계를 제공하지 않습니다.
 
-## 테스트
-- 로컬 JavaScript와 Python 문법 검사 수행
-- GitHub 원본과 신규 핵심 파일 구성 비교
-- **미실시:** 실제 로그인, 브라우저 E2E, 서버 접속, 주문 체결, 잔고 정산, HTS 실행/설치, Android 기기, 신규 Vercel 배포
-
-## 다음 단계
-1. 전용 Supabase/시세 서비스 준비 및 운영환경 분리
-2. 로그인·회원가입 및 주문 엔진 회귀 검증
-3. 거래 WTS의 차트·호가·주문·포지션 UI 고도화
-4. 관리자·입출금·손익 정합성 테스트
-5. HTS/MTS 빌드와 배포
+## 남은 운영 필수 개발
+전용 회원 인증, DB/RLS, 체결·증거금·미체결·청산 및 원장 서버, 시장 데이터 라이선스/시세/만기 관리, 실운영 관리자·승인, 보안 및 거래 회귀 검증, HTS·Android 설치/서명, 배포 및 실기기 테스트.
