@@ -1,0 +1,232 @@
+name: Build and publish VELTRO HTS
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'desktop/RELEASE'
+      - 'desktop/patch/chart_v20.py'
+      - 'desktop/patch/ls_only_v21.py'
+      - 'desktop/patch/databento_chart_v22.py'
+      - 'desktop/patch/databento_chart_v23.py'
+      - 'desktop/patch/indicators_v24.py'
+      - 'desktop/patch/hsi_ls_v25.py'
+      - 'desktop/patch/hsi_ref_v26.py'
+      - 'desktop/patch/hsi_history_v27.py'
+      - 'desktop/patch/hsi_ipc_v28.py'
+      - 'desktop/patch/realtime_v30.py'
+      - 'desktop/patch/trade_runtime_v31.py'
+      - 'desktop/patch/login_v32.py'
+      - 'desktop/patch/login_v33.py'
+      - 'desktop/patch/hsi_rollover_v34.py'
+      - 'desktop/patch/remove_hsi_v35.py'
+      - 'desktop/patch/hsi_maintenance_v36.py'
+      - 'desktop/patch/signup_v37.py'
+      - 'desktop/patch/updater_v39.py'
+      - 'desktop/patch/bbo_v44.py'
+      - '.github/workflows/build-veltro-hts.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: veltro-hts-release
+  cancel-in-progress: false
+
+jobs:
+  build-windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Read release version
+        id: version
+        shell: pwsh
+        run: |
+          $v = (Get-Content desktop/RELEASE -Raw -Encoding UTF8).Trim()
+          if ($v -notmatch '^\d+\.\d+\.\d+$') { throw "desktop/RELEASE must contain only x.y.z, got: $v" }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "VELTRO release version: $v"
+
+      - name: Rebuild verified v1.0.12 base
+        shell: pwsh
+        run: |
+          @'
+          import pathlib, re, subprocess, sys, textwrap
+          root=pathlib.Path.cwd()
+          base_workflow_path=root/'.github'/'workflows'/'build-veltro-hts.yml'
+          current_workflow=base_workflow_path.read_text(encoding='utf-8')
+          legacy_ref='d8e4b5720be775c2161d21e0fa251f882bf35f9c'
+          legacy_workflow=subprocess.check_output(['git','show',f'{legacy_ref}:.github/workflows/build-veltro-hts.yml'],text=True,encoding='utf-8')
+          try:
+              base_workflow_path.write_text(legacy_workflow,encoding='utf-8')
+              wf=(root/'.github'/'workflows'/'build-veltro-hts-v112.yml').read_text(encoding='utf-8')
+              m1=re.search(r"- name: Rebuild v1\.0\.11 source exactly.*?run: \|\s*@'\s*\n(.*?)\n\s*'@ \| Set-Content -Path extract_v111\.py",wf,re.S)
+              if not m1: raise RuntimeError('Could not extract the verified v1.0.11 rebuild bootstrap')
+              exec(compile(textwrap.dedent(m1.group(1)),'extract_v111.py','exec'),{'__name__':'__main__'})
+              subprocess.run([sys.executable,'make_v111.py'],check=True)
+              subprocess.run([sys.executable,'patch_v111.py'],check=True)
+              m2=re.search(r"- name: Apply v1\.0\.12 login-poster-only runtime fix.*?run: \|\s*@'\s*\n(.*?)\n\s*'@ \| Set-Content -Path patch_v112\.py",wf,re.S)
+              if not m2: raise RuntimeError('Could not extract the verified v1.0.12 patch')
+              exec(compile(textwrap.dedent(m2.group(1)),'patch_v112.py','exec'),{'__name__':'__main__'})
+          finally:
+              base_workflow_path.write_text(current_workflow,encoding='utf-8')
+          if not (root/'desktop'/'build'/'package.json').exists(): raise RuntimeError('v1.0.12 base rebuild did not produce desktop/build')
+          print('Verified v1.0.12 base reconstructed')
+          '@ | Set-Content -Path rebuild_verified_base.py -Encoding UTF8
+          python rebuild_verified_base.py
+
+      - name: Apply current VELTRO patch
+        shell: pwsh
+        env:
+          VELTRO_VERSION: ${{ steps.version.outputs.version }}
+        run: python desktop/patch/current.py
+
+      - name: Apply trading-style chart patch
+        shell: pwsh
+        run: python desktop/patch/chart_v20.py
+
+      - name: Enforce LS-only chart data
+        shell: pwsh
+        run: python desktop/patch/ls_only_v21.py
+
+      - name: Switch chart to Databento historical validation
+        shell: pwsh
+        run: python desktop/patch/databento_chart_v22.py
+
+      - name: Fix Databento multi-symbol and timeframe routing
+        shell: pwsh
+        run: python desktop/patch/databento_chart_v23.py
+
+      - name: Add working indicators and chart attribution handling
+        shell: pwsh
+        run: python desktop/patch/indicators_v24.py
+
+      - name: Route HSI chart to LS Securities
+        shell: pwsh
+        run: python desktop/patch/hsi_ls_v25.py
+
+      - name: Fix HSI chart market reference routing
+        shell: pwsh
+        run: python desktop/patch/hsi_ref_v26.py
+
+      - name: Expand HSI LS historical candles
+        shell: pwsh
+        run: python desktop/patch/hsi_history_v27.py
+
+      - name: Route HSI history through Electron main IPC
+        shell: pwsh
+        run: python desktop/patch/hsi_ipc_v28.py
+
+      - name: Enable LS OVC realtime chart stream
+        shell: pwsh
+        run: python desktop/patch/realtime_v30.py
+
+      - name: Stabilize live trading price and PnL runtime
+        shell: pwsh
+        run: python desktop/patch/trade_runtime_v31.py
+
+      - name: Apply v1.0.32 login startup patch
+        shell: pwsh
+        run: python desktop/patch/login_v32.py
+
+      - name: Restore original login poster behavior and requested icons
+        shell: pwsh
+        run: python desktop/patch/login_v33.py
+
+      - name: Apply HSI current-contract rollover guard
+        shell: pwsh
+        run: python desktop/patch/hsi_rollover_v34.py
+
+      - name: Remove HSI from selectable instruments
+        shell: pwsh
+        run: python desktop/patch/remove_hsi_v35.py
+
+      - name: Restore HSI as maintenance-only instrument
+        shell: pwsh
+        run: python desktop/patch/hsi_maintenance_v36.py
+
+      - name: Preserve existing signup entry behavior
+        shell: pwsh
+        run: python desktop/patch/signup_v37.py
+
+      - name: Enforce reliable GitHub auto updater
+        shell: pwsh
+        run: python desktop/patch/updater_v39.py
+
+      - name: Use real Databento BBO without synthetic price offsets
+        shell: pwsh
+        run: python desktop/patch/bbo_v44.py
+
+      - name: Install dependencies
+        working-directory: desktop/build
+        run: npm install --no-audit --no-fund
+
+      - name: Validate JavaScript and updater configuration
+        working-directory: desktop/build
+        run: |
+          node --check src/main.js
+          node --check src/preload.js
+          node --check src/renderer.js
+          node -e "const p=require('./package.json'); if(!p.build?.publish?.some(x=>x.provider==='github'&&x.owner==='dlxodnjs2456-hash'&&x.repo==='veltro')) process.exit(1)"
+
+      - name: Build NSIS installer
+        working-directory: desktop/build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npm run release:win
+
+      - name: Verify packaged login poster and update metadata
+        shell: pwsh
+        run: |
+          $poster = Join-Path $PWD 'desktop/build/dist/win-unpacked/resources/login-left.jpg'
+          if (!(Test-Path $poster)) { throw "Packaged login poster missing: $poster" }
+          $hash = (Get-FileHash $poster -Algorithm SHA256).Hash.ToLower()
+          $expected = 'b37d4a5df16d9b1cfca3f8cf1b75402f863b379fa26ab5b48cf24112d3fc1980'
+          if ($hash -ne $expected) { throw "Packaged login poster hash mismatch: $hash" }
+          if (!(Test-Path 'desktop/build/dist/latest.yml')) { throw 'latest.yml missing' }
+          if (!(Test-Path 'desktop/build/dist/VELTRO_HTS_Setup.exe.blockmap')) { throw 'blockmap missing' }
+          Select-String -Path 'desktop/build/dist/latest.yml' -Pattern ('version: ' + '${{ steps.version.outputs.version }}') -SimpleMatch | Out-Null
+          Write-Host "Packaged login poster and updater metadata verified"
+
+      - name: Publish auto-update release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          TAG="v${VERSION}"
+          if gh release view "$TAG" >/dev/null 2>&1; then gh release delete "$TAG" --cleanup-tag --yes; fi
+          gh release create "$TAG" \
+            desktop/build/dist/VELTRO_HTS_Setup.exe \
+            desktop/build/dist/VELTRO_HTS_Setup.exe.blockmap \
+            desktop/build/dist/latest.yml \
+            --target main --latest \
+            --title "VELTRO HTS v${VERSION}" \
+            --notes "VELTRO HTS v${VERSION} uses Databento live trade/BBO data consistently and removes synthetic last-price bid/ask offsets. Existing member, balance, order, position, deposit/withdrawal, notice, notification, database, margin, PnL, login, signup, and HSI maintenance behavior are preserved."
+
+      - name: Verify published release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          TAG="v${VERSION}"
+          gh release view "$TAG" --json assets --jq '.assets[].name' | tee release-assets.txt
+          grep -Fx 'VELTRO_HTS_Setup.exe' release-assets.txt
+          grep -Fx 'VELTRO_HTS_Setup.exe.blockmap' release-assets.txt
+          grep -Fx 'latest.yml' release-assets.txt
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VELTRO-HTS-Setup-${{ steps.version.outputs.version }}
+          path: |
+            desktop/build/dist/VELTRO_HTS_Setup.exe
+            desktop/build/dist/VELTRO_HTS_Setup.exe.blockmap
+            desktop/build/dist/latest.yml
