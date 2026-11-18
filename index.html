@@ -209,7 +209,8 @@ function showAuth(mode){$('#auth-title').textContent=mode==='signup'?'회원가�
 const appState={user:null,notices:[],noticeLoaded:false,noticePending:false,messages:[],messageLoaded:false,messagePending:false};
 const tradingState={loaded:false,pending:false,error:null,lastAt:0};
 function syncTradingState(){
- if(!appState.user||tradingState.pending)return;
+ if(!appState.user)return;
+ if(tradingState.pending){tradingState.recheck=true;return}
  tradingState.pending=true;
  apiCall('/api/trading/state').then(x=>{
   const previouslyLoaded=tradingState.loaded;
@@ -233,13 +234,13 @@ function syncTradingState(){
   tradingState.error='계좌 정보를 불러오지 못했습니다. 다시 조회해 주세요.';
   tradingState.loaded=false;
   if(session.on&&['futures','stocks','orders','pnl'].includes(session.page)&&previous!==tradingState.error)render();
- }).finally(()=>tradingState.pending=false);
+ }).finally(()=>{tradingState.pending=false;if(tradingState.recheck){tradingState.recheck=false;syncTradingState()}});
 }
 async function submitServerOrder(side){
  if(!tradingState.loaded){toast('거래 계좌가 연결되지 않았습니다. 다시 조회한 뒤 주문해 주세요.');return}
  const symbol=session.symbol,qty=Number($('#qty')?.value),type=session.orderType,limit=Number($('#limit-price')?.value);
  const s=getSym(symbol);
- if(!Number.isSafeInteger(qty)||qty<1||qty>100){toast('주문 수량은 1~100 사이로 입력해 주세요.');return}
+ if(!Number.isSafeInteger(qty)||qty<1||qty>(s.kind==='stocks'?100000:100)){toast('주문 수량이 올바르지 않습니다.');return}
  if(s.kind==='stocks'&&type==='market'){
   if(!tradingState.stockEnabled){toast('국내주식 내부 체결 서비스를 현재 이용할 수 없습니다.');return}
   const requestKey=crypto.randomUUID();
