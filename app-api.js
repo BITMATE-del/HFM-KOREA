@@ -1,12 +1,31 @@
 "use strict";
 const {Pool}=require("pg");
-const {randomBytes,scrypt:rawScrypt,createHash,timingSafeEqual}=require("node:crypto");
+const {randomBytes,scrypt:rawScrypt,createHash,timingSafeEqual,createCipheriv}=require("node:crypto");
 const {promisify}=require("node:util");
 const scrypt=promisify(rawScrypt);
+function encryptAccount(value){
+ const hex=String(process.env.HFM_ACCOUNT_ENCRYPTION_KEY||"");
+ if(!/^[a-f0-9]{64}$/i.test(hex))throw Error("ACCOUNT_ENCRYPTION_NOT_CONFIGURED");
+ const iv=randomBytes(12),cipher=createCipheriv("aes-256-gcm",Buffer.from(hex,"hex"),iv);
+ const body=Buffer.concat([cipher.update(value,"utf8"),cipher.final()]);
+ return ["v1",iv.toString("hex"),cipher.getAuthTag().toString("hex"),body.toString("hex")].join(":");
+}
+function parseBirthday(v){
+ const s=String(v||"").trim(),match=/^(\d{4})(\d{2})(\d{2})$/.exec(s);
+ if(!match)return null;
+ const y=Number(match[1]),m=Number(match[2]),d=Number(match[3]);
+ const date=new Date(Date.UTC(y,m-1,d));
+ if(date.getUTCFullYear()!==y||date.getUTCMonth()+1!==m||date.getUTCDate()!==d)return null;
+ const now=new Date(),min=new Date(Date.UTC(now.getUTCFullYear()-120,now.getUTCMonth(),now.getUTCDate()));
+ if(date>now||date<min)return null;
+ return s.slice(0,4)+"-"+s.slice(4,6)+"-"+s.slice(6,8);
+}
+
 const pool=new Pool({connectionString:process.env.DATABASE_URL,max:6,connectionTimeoutMillis:8000});
 let initializing=null;
 const tables=[
 "CREATE TABLE IF NOT EXISTS hf_users(id BIGSERIAL PRIMARY KEY, username VARCHAR(32) UNIQUE NOT NULL, password_hash TEXT NOT NULL, full_name VARCHAR(80) NOT NULL, phone VARCHAR(24) NOT NULL, referral VARCHAR(40) NOT NULL DEFAULT '', role VARCHAR(12) NOT NULL DEFAULT 'MEMBER' CHECK(role IN ('MEMBER','ADMIN')), status VARCHAR(12) NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE','FROZEN')), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
+"CREATE TABLE IF NOT EXISTS hf_member_profiles(user_id BIGINT PRIMARY KEY REFERENCES hf_users(id) ON DELETE CASCADE,birth_date DATE,manager_name VARCHAR(80) NOT NULL DEFAULT '',bank_name VARCHAR(80) NOT NULL DEFAULT '',bank_account_cipher TEXT,bank_account_last4 VARCHAR(4) NOT NULL DEFAULT '',account_holder VARCHAR(80) NOT NULL DEFAULT '',updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
 "CREATE TABLE IF NOT EXISTS hf_sessions(token_hash CHAR(64) PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES hf_users(id) ON DELETE CASCADE, expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
 "CREATE INDEX IF NOT EXISTS hf_sessions_user ON hf_sessions(user_id)",
 "CREATE TABLE IF NOT EXISTS hf_notices(id BIGSERIAL PRIMARY KEY, title VARCHAR(160) NOT NULL, body TEXT NOT NULL, pinned BOOLEAN NOT NULL DEFAULT FALSE, visible BOOLEAN NOT NULL DEFAULT TRUE, author_id BIGINT REFERENCES hf_users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
@@ -64,10 +83,30 @@ async function route(req,res,url){
   if(m!=="GET"&&origin&&new URL(origin).host!==req.headers.host){send(res,403,{error:"ORIGIN_MISMATCH"});return true}
   const b=m==="GET"||m==="DELETE"?{}:await bodyOf(req);
   if(p==="/api/auth/register"&&m==="POST"){
-   const id=String(b.id||"").toLowerCase(),pwd=String(b.password||""),name=String(b.name||"").trim(),phone=String(b.phone||"").replace(/[-\s]/g,""),ref=String(b.referral||"").trim();
-   if(!/^[a-z0-9_]{4,32}$/.test(id)||pwd.length<10||pwd.length>128||name.length<2||name.length>80||!/^(?:010\d{8}|01[16789]\d{7,8})$/.test(phone)||ref.length>40){send(res,400,{error:"INVALID_REGISTRATION"});return true}
-   try{const row=await pool.query("INSERT INTO hf_users(username,password_hash,full_name,phone,referral) VALUES($1,$2,$3,$4,$5) RETURNING id",[id,await passHash(pwd),name,phone,ref]);await audit(row.rows[0].id,"REGISTER");send(res,201,{ok:true})}
-   catch(e){if(e.code==="23505")send(res,409,{error:"DUPLICATE_USERNAME"});else throw e}return true;
+   const id=String(b.id||"").toLowerCase(),pwd=String(b.password||""),confirm=String(b.passwordConfirm||""),
+     name=String(b.name||"").trim(),phone=String(b.phone||"").replace(/[-\s]/g,""),
+     manager=String(b.managerName||"").trim(),birthday=parseBirthday(b.birthDate),
+     bank=String(b.bank||"").trim(),number=String(b.accountNumber||"").replace(/[\s-]/g,""),holder=String(b.accountHolder||"").trim();
+   if(!/^[a-z0-9_]{4,32}$/.test(id)||pwd.length<10||pwd.length>128||confirm!==pwd||
+      name.length<2||name.length>80||!/^(?:010\d{8}|01[16789]\d{7,8})$/.test(phone)||
+      !birthday||manager.length>80||!bank||bank.length>80||!/^[0-9]{8,20}$/.test(number)||
+      !holder||holder.length>80||b.agree!==true){
+    send(res,400,{error:"INVALID_REGISTRATION"});return true;
+   }
+   const encrypted=encryptAccount(number),passwordHash=await passHash(pwd),client=await pool.connect();
+   try{
+    await client.query("BEGIN");
+    const row=await client.query("INSERT INTO hf_users(username,password_hash,full_name,phone,referral) VALUES($1,$2,$3,$4,'') RETURNING id",[id,passwordHash,name,phone]);
+    const userId=row.rows[0].id;
+    await client.query("INSERT INTO hf_member_profiles(user_id,birth_date,manager_name,bank_name,bank_account_cipher,bank_account_last4,account_holder) VALUES($1,$2,$3,$4,$5,$6,$7)",
+       [userId,birthday,manager,bank,encrypted,number.slice(-4),holder]);
+    await client.query("INSERT INTO hf_audit(actor_id,action,target) VALUES($1,'REGISTER',$2)",[userId,String(userId)]);
+    await client.query("COMMIT");send(res,201,{ok:true});return true;
+   }catch(e){
+    await client.query("ROLLBACK").catch(()=>{});
+    if(e.code==="23505"){send(res,409,{error:"DUPLICATE_USERNAME"});return true}
+    throw e;
+   }finally{client.release()}
   }
   if(p==="/api/auth/login"&&m==="POST"){
    const id=String(b.id||"").toLowerCase(),pwd=String(b.password||"");
