@@ -45,8 +45,11 @@ async function route(req,res,url){
     }
     const count=await c.query("SELECT COUNT(*)::int AS n FROM hf_orders WHERE user_id=$1 AND status='HELD'",[u.id]);
     if(count.rows[0].n>=100){await c.query("ROLLBACK");send(res,409,{error:"TOO_MANY_HELD_ORDERS"});return true}
-    const r=await c.query("INSERT INTO hf_orders(user_id,request_key,symbol,product,side,order_type,qty,limit_price) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *",[u.id,key,symbol,spec[0],side,type,qty,limit]);
-    await c.query("INSERT INTO hf_audit(actor_id,action,target) VALUES($1,'ORDER_HELD',$2)",[u.id,String(r.rows[0].id)]);
+    const r=await c.query("INSERT INTO hf_orders(user_id,request_key,symbol,product,side,order_type,qty,limit_price) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(user_id,request_key) DO NOTHING RETURNING *",[u.id,key,symbol,spec[0],side,type,qty,limit]);
+    if(!r.rowCount){const found=(await c.query("SELECT * FROM hf_orders WHERE user_id=$1 AND request_key=$2",[u.id,key])).rows[0];
+ if(!found||found.symbol!==symbol||found.side!==side||found.order_type!==type||found.qty!==qty||Number(found.limit_price)!==limit){await c.query("ROLLBACK");send(res,409,{error:"REQUEST_KEY_CONFLICT"});return true}
+ await c.query("COMMIT");send(res,200,{ok:true,duplicate:true,order:dto(found)});return true}
+ await c.query("INSERT INTO hf_audit(actor_id,action,target) VALUES($1,'ORDER_HELD',$2)",[u.id,String(r.rows[0].id)]);
     await c.query("COMMIT");send(res,201,{ok:true,executionEnabled:false,order:dto(r.rows[0])});return true;
    }catch(e){await c.query("ROLLBACK").catch(()=>{});throw e}finally{c.release()}
   }
