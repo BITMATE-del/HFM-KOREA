@@ -84,7 +84,7 @@ async function pullStockQuote(id){
   if(q.symbol!==id||!(q.price>0)||!(q.previousClose>0))throw Error('QUOTE_INVALID');
   stockFeed.quotes[id]=q;stockFeed.errors[id]=null;
   priceState[id].price=q.price;
-  if(session.on&&session.page==='stocks'&&session.symbol===id)render();
+  if(session.on&&session.page==='stocks'&&session.symbol===id)refreshPrices();
  }catch(e){
   stockFeed.errors[id]='국내주식 시세를 불러올 수 없습니다.';
   if(session.on&&session.page==='stocks'&&session.symbol===id&&!stockFeed.quotes[id])render();
@@ -129,13 +129,16 @@ function syncTradingState(){
  if(!appState.user||tradingState.pending)return;
  tradingState.pending=true;
  apiCall('/api/trading/state').then(x=>{
+  const previouslyLoaded=tradingState.loaded;
+  const oldSnapshot=tradingState.snapshot;
+  const newSnapshot=JSON.stringify({orders:x.orders,positions:x.positions,fills:x.fills,wallet:x.wallet});
   data.cash=Number(x.wallet?.futuresBalance||0);
   data.stockCash=Number(x.wallet?.stocksBalance||0);
   data.orders=(x.orders||[]).map(o=>({id:o.id,symbol:o.symbol,side:o.side,type:o.type.toLowerCase(),qty:o.qty,limit:o.limitPrice,status:o.status==='HELD'?'open':o.status.toLowerCase(),at:o.createdAt,serverHeld:o.status==='HELD'}));
   data.positions=(x.positions||[]).filter(p=>p.state==='OPEN').map(p=>({id:p.id,symbol:p.symbol,side:p.side,qty:p.qty,entry:p.entry,margin:0,at:p.openedAt}));
   data.transactions=(x.fills||[]).map(f=>({id:f.id,type:'fee',kind:getSym(f.symbol).kind,amount:-Number(f.feeKrw||0),symbol:f.symbol,at:f.executedAt}));
-  tradingState.loaded=true;tradingState.error=null;tradingState.lastAt=Date.now();
-  if(session.on)render();
+  tradingState.loaded=true;tradingState.error=null;tradingState.lastAt=Date.now();tradingState.snapshot=newSnapshot;
+  if(session.on&&(!previouslyLoaded||oldSnapshot!==newSnapshot))render();
  }).catch(e=>{
   tradingState.error='거래 기록을 불러올 수 없습니다.';
   tradingState.loaded=false;
