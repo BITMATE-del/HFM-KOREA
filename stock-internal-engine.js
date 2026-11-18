@@ -130,7 +130,20 @@ async function rollbackSmoke(){
    c.query("SELECT delta,balance_after FROM hf_wallet_ledger WHERE user_id=$1 ORDER BY id",[userId])
   ]);
   if(Number(pos.rows[0]?.qty)!==6||Number(pos.rows[0]?.cost_krw)!==60000||rows.rowCount!==2)fail("SMOKE_LEDGER_MISMATCH");
-  return {ok:true,bought:10,sold:4,remaining:6,ledger:2,duplicateBlocked:true,rolledBack:true};
+  for(const [item,reason] of [
+   [{symbol:"005930",side:"SELL",qty:7,requestKey:crypto.randomUUID()},"INSUFFICIENT_SHARES"],
+   [{symbol:"005930",side:"BUY",qty:1000,requestKey:crypto.randomUUID()},"INSUFFICIENT_BALANCE"],
+   [{symbol:"005930",side:"BUY",qty:11,requestKey:buyKey},"IDEMPOTENCY_CONFLICT"]
+  ]){
+   let blocked=false;
+   try{await transact(c,userId,item,quote)}
+   catch(e){blocked=e.code===reason;if(!blocked)throw e}
+   if(!blocked)fail("SMOKE_RISK_CHECK_FAILED_"+reason);
+  }
+  const after=await c.query("SELECT stocks_balance FROM hf_wallets WHERE user_id=$1",[userId]);
+  if(String(after.rows[0]?.stocks_balance)!=="940000")fail("SMOKE_BALANCE_CHANGED_AFTER_BLOCK");
+
+  return {ok:true,bought:10,sold:4,remaining:6,ledger:2,duplicateBlocked:true,insufficientFundsBlocked:true,oversellBlocked:true,conflictingRetryBlocked:true,rolledBack:true};
  }finally{await c.query("ROLLBACK").catch(()=>{});c.release()}
 }
 async function route(req,res,url,quoteProvider){
