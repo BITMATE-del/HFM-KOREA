@@ -3,7 +3,7 @@
  * atomic wallet debit/credit, average-cost holdings, idempotent orders, audit ledger.
  * No external broker/exchange order is ever placed.
  * Not callable with a synthetic quote through HTTP. Require a sufficiently recent
- * server-side provider price AND explicit entitlement/feature configuration. */
+ * server-side provider price and explicit feature configuration. */
 const crypto=require("node:crypto");
 const core=require("./app-api"),funding=require("./funding-api"),directory=require("./stock-directory");
 const {pool,auth}=core;
@@ -27,9 +27,9 @@ function checkOrder(b){
 function checkQuote(quote,now=Date.now()){
  const price=Number(quote?.price),asOf=Date.parse(quote?.asOf||"");
  if(!Number.isSafeInteger(price)||price<=0||!Number.isFinite(asOf))fail("REFERENCE_QUOTE_UNAVAILABLE");
- if(now-asOf>15000||asOf-now>1000)fail("REFERENCE_QUOTE_STALE");
+ if(now-asOf>60000||asOf-now>5000)fail("REFERENCE_QUOTE_STALE");
  if(quote?.marketStatus!=="REGULAR_SESSION")fail("MARKET_CLOSED");
- if(quote?.tradeable!==true)fail("QUOTE_ENTITLEMENT_REQUIRED");
+ if(quote?.tradeable!==true)fail("REFERENCE_QUOTE_UNAVAILABLE");
  if(typeof quote?.source!=="string"||!quote.source)fail("INVALID_QUOTE_SOURCE");
  return {price,asOf:new Date(asOf).toISOString(),source:quote.source};
 }
@@ -53,7 +53,7 @@ async function ensure(){
  return initialized;
 }
 function allowed(){
- return process.env.HFM_STOCK_INTERNAL_TRADING_ENABLED==="true"&&process.env.HFM_STOCK_QUOTE_ENTITLED==="true";
+ return process.env.HFM_STOCK_INTERNAL_TRADING_ENABLED==="true";
 }
 async function state(userId){
  await ensure();
