@@ -20,7 +20,8 @@ async function route(req,res,url){
   await ensure();
   if(req.method!=="GET"&&req.headers.origin&&new URL(req.headers.origin).host!==req.headers.host){send(res,403,{error:"ORIGIN_MISMATCH"});return true}
   const u=await auth(req);if(!u){send(res,401,{error:"LOGIN_REQUIRED"});return true}
-  if(path.startsWith("/api/admin/")&&u.role!=="ADMIN"){send(res,403,{error:"ADMIN_REQUIRED"});return true}
+  const admin=path.startsWith("/api/admin/");
+  if(admin&&u.role!=="ADMIN"){send(res,403,{error:"ADMIN_REQUIRED"});return true}
   const m=req.method,b=m==="POST"?await read(req):{};
   if(!admin&&m==="POST"&&path.startsWith("/api/trading/orders")){
    const blocked=await pool.query("SELECT futures_blocked,stocks_blocked FROM hf_member_restrictions WHERE user_id=$1",[u.id]);
