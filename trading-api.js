@@ -1,6 +1,7 @@
 "use strict";
 const core=require("./app-api"),funding=require("./funding-api");
 const {pool,auth}=core;
+const stockDirectory=require("./stock-directory");
 const instruments={NQ:["FUTURES",.25],MNQ:["FUTURES",.25],ES:["FUTURES",.25],MES:["FUTURES",.25],GC:["FUTURES",.1],MGC:["FUTURES",.1],CL:["FUTURES",.01],"005930":["STOCKS",1],"000660":["STOCKS",1],"035420":["STOCKS",1],"005380":["STOCKS",1]};
 const SQL=[
 "CREATE TABLE IF NOT EXISTS hf_orders(id BIGSERIAL PRIMARY KEY,user_id BIGINT NOT NULL REFERENCES hf_users(id) ON DELETE CASCADE,request_key UUID NOT NULL,symbol VARCHAR(12) NOT NULL,product VARCHAR(12) NOT NULL CHECK(product IN ('FUTURES','STOCKS')),side VARCHAR(4) NOT NULL CHECK(side IN ('BUY','SELL')),order_type VARCHAR(8) NOT NULL CHECK(order_type IN ('LIMIT','MARKET')),qty INTEGER NOT NULL CHECK(qty>0 AND qty<=100),limit_price NUMERIC(18,5),status VARCHAR(12) NOT NULL DEFAULT 'HELD' CHECK(status IN ('HELD','CANCELLED','FILLED','REJECTED')),reason VARCHAR(80) NOT NULL DEFAULT 'MARKET_DATA_NOT_AVAILABLE',created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(user_id,request_key))",
@@ -25,7 +26,7 @@ async function route(req,res,url){
   const m=req.method,b=m==="POST"?await read(req):{};
   if(!admin&&m==="POST"&&path.startsWith("/api/trading/orders")){
    const blocked=await pool.query("SELECT futures_blocked,stocks_blocked FROM hf_member_restrictions WHERE user_id=$1",[u.id]);
-   const x=blocked.rows[0],spec=instruments[String(b.symbol||"").toUpperCase()];
+   const x=blocked.rows[0],code=String(b.symbol||"").toUpperCase(),spec=instruments[code]||(/^[0-9]{6}$/.test(code)?["STOCKS",1]:null);
    if((x?.futures_blocked&&spec?.[0]==="FUTURES")||(x?.stocks_blocked&&spec?.[0]==="STOCKS")){send(res,403,{error:"TRADING_RESTRICTED"});return true}
   }
   if(path==="/api/trading/state"&&m==="GET"){
@@ -58,8 +59,13 @@ async function route(req,res,url){
    return true;
   }
   if(path==="/api/trading/orders"&&m==="POST"){
-   const symbol=String(b.symbol||"").toUpperCase(),spec=instruments[symbol],side=String(b.side||""),type=String(b.type||"").toUpperCase(),qty=Number(b.qty),limit=Number(b.limitPrice),key=String(b.requestKey||"");
+   const symbol=String(b.symbol||"").toUpperCase(),spec=instruments[symbol]||(/^[0-9]{6}$/.test(symbol)?["STOCKS",1]:null),side=String(b.side||""),type=String(b.type||"").toUpperCase(),qty=Number(b.qty),limit=Number(b.limitPrice),key=String(b.requestKey||"");
    if(!spec||!["BUY","SELL"].includes(side)||!["LIMIT","MARKET"].includes(type)||!Number.isSafeInteger(qty)||qty<1||qty>100||!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(key)){send(res,400,{error:"INVALID_ORDER"});return true}
+   if(spec[0]==="STOCKS"){
+    let listed;
+    try{listed=await stockDirectory.find(symbol)}catch{send(res,503,{error:"STOCK_CATALOG_UNAVAILABLE"});return true}
+    if(!listed){send(res,404,{error:"STOCK_SYMBOL_NOT_LISTED"});return true}
+   }
    if(type==="MARKET"){send(res,409,{error:"MARKET_DATA_UNAVAILABLE",executionEnabled:false});return true}
    if(!Number.isFinite(limit)||limit<=0||Math.abs(Math.round(limit/spec[1])*spec[1]-limit)>1e-6){send(res,400,{error:"INVALID_TICK_PRICE"});return true}
    const c=await pool.connect();try{

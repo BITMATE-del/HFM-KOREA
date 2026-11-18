@@ -7,6 +7,7 @@ const appApi=require("./app-api");
 const fundingApi=require("./funding-api");
 const tradingApi=require("./trading-api");
 const memberAdmin=require("./member-admin-api");
+const stockDirectory=require("./stock-directory");
 const sandboxSettlement=require("./sandbox-settlement");
 const mime={".html":"text/html; charset=utf-8",".js":"application/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".json":"application/json; charset=utf-8",".svg":"image/svg+xml",".png":"image/png",".ico":"image/x-icon",".jpg":"image/jpeg",".jpeg":"image/jpeg",".webp":"image/webp",".txt":"text/plain; charset=utf-8"};
 
@@ -217,13 +218,15 @@ http.createServer(async (req,res)=>{
   if(await appApi.route(req,res,url))return;
   if(url.pathname==="/api/stocks/catalog"){
    if(req.method!=="GET")return jsonResponse(res,405,{error:"METHOD_NOT_ALLOWED"});
-   try{return jsonResponse(res,200,await stockCatalog(url.searchParams.get("q")||""))}
+   try{return jsonResponse(res,200,await stockDirectory.search(url.searchParams.get("q")||"",url.searchParams.get("page")||1))}
    catch(e){console.warn("STOCK_CATALOG_ERROR",String(e.message).slice(0,55));return jsonResponse(res,503,{error:"STOCK_CATALOG_UNAVAILABLE"})}
   }
   if(url.pathname==="/api/stocks/quote"||url.pathname==="/api/stocks/intraday"){
    if(req.method!=="GET")return jsonResponse(res,405,{error:"METHOD_NOT_ALLOWED"});
    const symbol=url.searchParams.get("symbol")||"";
    if(!STOCK_CODE.test(symbol))return jsonResponse(res,400,{error:"INVALID_SYMBOL"});
+   try{if(!await stockDirectory.find(symbol))return jsonResponse(res,404,{error:"STOCK_SYMBOL_NOT_LISTED"})}
+   catch{return jsonResponse(res,503,{error:"STOCK_CATALOG_UNAVAILABLE"})}
    const period=url.searchParams.get("period")||"minute1";
    if(url.pathname.endsWith("/intraday")&&!["minute1","minute5","minute15","minute60","day","week","month"].includes(period))return jsonResponse(res,400,{error:"INVALID_PERIOD"});
    try{
