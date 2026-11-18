@@ -70,6 +70,7 @@ async function transact(c,userId,order,quote){
  const q=checkQuote(quote);
  if(!Number.isSafeInteger(qty*q.price)||qty*q.price>10000000000)fail("ORDER_TOO_LARGE");
  const gross=BigInt(qty)*BigInt(q.price),fee=0n;
+ const acc=await c.query("SELECT role,status FROM hf_users WHERE id=$1 FOR UPDATE",[userId]);
  await c.query("INSERT INTO hf_wallets(user_id) VALUES($1) ON CONFLICT(user_id) DO NOTHING",[userId]);
  const wallet=await c.query("SELECT stocks_balance FROM hf_wallets WHERE user_id=$1 FOR UPDATE",[userId]);
  if(wallet.rowCount!==1)fail("WALLET_NOT_FOUND");
@@ -79,7 +80,7 @@ async function transact(c,userId,order,quote){
   if(String(row.user_id)!==String(userId)||row.symbol.trim()!==symbol||row.side!==side||Number(row.qty)!==qty)fail("IDEMPOTENCY_CONFLICT");
   return {id,duplicate:true,priceKrw:Number(row.price_krw),grossKrw:String(row.gross_krw)};
  }
- const acc=await c.query("SELECT role,status FROM hf_users WHERE id=$1 FOR UPDATE",[userId]);
+
  if(acc.rowCount!==1||acc.rows[0].status!=="ACTIVE")fail("MEMBER_NOT_ACTIVE");
  const restriction=await c.query("SELECT stocks_blocked FROM hf_member_restrictions WHERE user_id=$1",[userId]);
  if(restriction.rows[0]?.stocks_blocked)fail("STOCK_TRADING_RESTRICTED");
