@@ -202,7 +202,7 @@ function openMargin(){return data.positions.filter(p=>getSym(p.symbol).kind==='f
 function floatingPnl(){return data.positions.filter(p=>getSym(p.symbol).kind==='futures').reduce((sum,p)=>sum+(price(p.symbol)-p.entry)*(p.side==='BUY'?1:-1)*p.qty*getSym(p.symbol).mult*1400,0)}
 function stockValue(){return data.positions.filter(p=>getSym(p.symbol).kind==='stocks').reduce((sum,p)=>sum+price(p.symbol)*p.qty,0)}
 function available(){return data.cash-openMargin()}
-const fees=(symbol,qty)=>getSym(symbol).kind==='stocks'?Math.round(price(symbol)*qty*.00015):qty*1500;
+const fees=(symbol,qty)=>getSym(symbol).kind==='stocks'?0:qty*1500;
 function login(id){session.on=true;session.id=id||'사용자';$('#auth').classList.add('hidden');$('#platform').classList.remove('hidden');$('#user-name').textContent=session.id;if(appState.user){data.cash=0;data.stockCash=0;data.positions=[];data.orders=[];data.transactions=[];tradingState.loaded=false;syncTradingState()}render();}
 function showAuth(mode){$('#auth-title').textContent=mode==='signup'?'회원가입':'로그인';$('#auth-sub').textContent=mode==='signup'?'계정 등록을 위한 기본 정보를 입력하세요.':'해외선물 트레이딩 서비스에 오신 것을 환영합니다.';$('#login-form').classList.toggle('hidden',mode!=='login');$('#signup-form').classList.toggle('hidden',mode!=='signup');$('#auth-alert').textContent='';}
 
@@ -217,9 +217,10 @@ function syncTradingState(){
   const newSnapshot=JSON.stringify({orders:x.orders,positions:x.positions,fills:x.fills,wallet:x.wallet});
   data.cash=Number(x.wallet?.futuresBalance||0);
   data.stockCash=Number(x.wallet?.stocksBalance||0);
-  data.orders=(x.orders||[]).map(o=>({id:o.id,symbol:o.symbol,side:o.side,type:o.type.toLowerCase(),qty:o.qty,limit:o.limitPrice,status:o.status==='HELD'?'open':o.status.toLowerCase(),at:o.createdAt,serverHeld:o.status==='HELD'}));
+  tradingState.stockEnabled=x.internalStockExecutionEnabled===true;
+  data.orders=(x.orders||[]).map(o=>({id:o.id,symbol:o.symbol,side:o.side,type:o.type.toLowerCase(),qty:o.qty,limit:o.limitPrice,status:o.status==='HELD'?'open':o.status.toLowerCase(),at:o.createdAt,serverHeld:o.status==='HELD',fillPrice:o.fillPrice,realizedPnlKrw:o.realizedPnlKrw}));
   data.positions=(x.positions||[]).filter(p=>p.state==='OPEN').map(p=>({id:p.id,symbol:p.symbol,side:p.side,qty:p.qty,entry:p.entry,margin:0,at:p.openedAt}));
-  data.transactions=(x.fills||[]).map(f=>({id:f.id,type:'fee',kind:getSym(f.symbol).kind,amount:-Number(f.feeKrw||0),symbol:f.symbol,at:f.executedAt}));
+  data.transactions=[...(x.fills||[]).map(f=>({id:f.id,type:'fee',kind:getSym(f.symbol).kind,amount:-Number(f.feeKrw||0),symbol:f.symbol,at:f.executedAt})),...(x.orders||[]).filter(o=>o.status==='FILLED'&&o.product==='STOCKS'&&o.side==='SELL'&&o.realizedPnlKrw!=null).map(o=>({id:o.id,type:'trade',kind:'stocks',pnl:Number(o.realizedPnlKrw),amount:Number(o.realizedPnlKrw),symbol:o.symbol,at:o.createdAt}))];
   tradingState.loaded=true;tradingState.error=null;tradingState.lastAt=Date.now();tradingState.snapshot=newSnapshot;
   if(session.on&&(!previouslyLoaded||oldSnapshot!==newSnapshot)){
    try{render()}catch(viewError){console.error('HFM_RENDER_ERROR',String(viewError?.message||viewError).slice(0,140))}
