@@ -8,6 +8,7 @@ const fundingApi=require("./funding-api");
 const tradingApi=require("./trading-api");
 const memberAdmin=require("./member-admin-api");
 const stockDirectory=require("./stock-directory");
+const stockEngine=require("./stock-internal-engine");
 const sandboxSettlement=require("./sandbox-settlement");
 const mime={".html":"text/html; charset=utf-8",".js":"application/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".json":"application/json; charset=utf-8",".svg":"image/svg+xml",".png":"image/png",".ico":"image/x-icon",".jpg":"image/jpeg",".jpeg":"image/jpeg",".webp":"image/webp",".txt":"text/plain; charset=utf-8"};
 
@@ -222,6 +223,7 @@ http.createServer(async (req,res)=>{
  try{
   const url=new URL(req.url,"http://localhost");
   if(await memberAdmin.route(req,res,url))return;
+  if(await stockEngine.route(req,res,url,stockQuote))return;
   if(await tradingApi.route(req,res,url))return;
   if(await fundingApi.route(req,res,url))return;
   if(await appApi.route(req,res,url))return;
@@ -291,7 +293,7 @@ http.createServer(async (req,res)=>{
   res.writeHead(200,{"Content-Type":mime[ext],"X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"strict-origin-when-cross-origin","Cache-Control":ext===".html"?"no-cache":"public, max-age=300"});
   fs.createReadStream(filepath).pipe(res)
  }catch(err){res.writeHead(400);res.end("Bad Request")}
-}).listen(port,host,()=>{console.log("HFM KOREA Futures web listening on "+port);appApi.ensureReady().then(async()=>{console.log("HFM_DATABASE_READY");await fundingApi.ensure();console.log("HFM_WALLET_DB_READY");await memberAdmin.ensure();console.log("HFM_MEMBER_ADMIN_DB_READY");await tradingApi.ensure();console.log("HFM_TRADING_DB_READY");await sandboxSettlement.initSchema(appApi.pool);console.log("HFM_SANDBOX_DB_READY");const settlementResult=await sandboxSettlement.rollbackSmoke(appApi.pool);console.log("HFM_SANDBOX_SETTLEMENT_SMOKE",JSON.stringify(settlementResult));try{const base="http://127.0.0.1:"+port;const endpoints=["/health","/api/auth/me","/api/notices"];const checks=[];for(const path of endpoints){const r=await fetch(base+path,{signal:AbortSignal.timeout(5500)});const j=await r.json();checks.push({path,status:r.status,valid:path==="/api/auth/me"?j.authenticated===false:path==="/api/notices"?Array.isArray(j.items):j.ok===true})}for(const path of ["/api/wallet/status","/api/admin/members"]){const r=await fetch(base+path,{signal:AbortSignal.timeout(5500)});const j=await r.json();checks.push({path,status:r.status,valid:r.status===401&&j.error==="LOGIN_REQUIRED"})}
+}).listen(port,host,()=>{console.log("HFM KOREA Futures web listening on "+port);appApi.ensureReady().then(async()=>{console.log("HFM_DATABASE_READY");await fundingApi.ensure();console.log("HFM_WALLET_DB_READY");await memberAdmin.ensure();console.log("HFM_MEMBER_ADMIN_DB_READY");await tradingApi.ensure();console.log("HFM_TRADING_DB_READY");await stockEngine.ensure();console.log("HFM_STOCK_ENGINE_DB_READY");const stockSmoke=await stockEngine.rollbackSmoke();console.log("HFM_STOCK_ENGINE_SMOKE",JSON.stringify(stockSmoke));await sandboxSettlement.initSchema(appApi.pool);console.log("HFM_SANDBOX_DB_READY");const settlementResult=await sandboxSettlement.rollbackSmoke(appApi.pool);console.log("HFM_SANDBOX_SETTLEMENT_SMOKE",JSON.stringify(settlementResult));try{const base="http://127.0.0.1:"+port;const endpoints=["/health","/api/auth/me","/api/notices"];const checks=[];for(const path of endpoints){const r=await fetch(base+path,{signal:AbortSignal.timeout(5500)});const j=await r.json();checks.push({path,status:r.status,valid:path==="/api/auth/me"?j.authenticated===false:path==="/api/notices"?Array.isArray(j.items):j.ok===true})}for(const path of ["/api/wallet/status","/api/admin/members"]){const r=await fetch(base+path,{signal:AbortSignal.timeout(5500)});const j=await r.json();checks.push({path,status:r.status,valid:r.status===401&&j.error==="LOGIN_REQUIRED"})}
 for(const path of ["/api/trading/state","/api/admin/trading/orders","/api/admin/trading/positions"]){const resp=await fetch(base+path,{signal:AbortSignal.timeout(5000)});const j=await resp.json();checks.push({path,status:resp.status,valid:resp.status===401&&j.error==="LOGIN_REQUIRED"})}
 for(const endpoint of ["/api/admin/member-tools/1","/api/admin/member-tools/1/adjustments"]){const r=await fetch(base+endpoint,{signal:AbortSignal.timeout(5000)});const j=await r.json();checks.push({path:endpoint,status:r.status,valid:r.status===403&&j.error==="ADMIN_REQUIRED"})}
 const blockedMutation=await fetch(base+"/api/admin/member-tools/1/restrictions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({login:true,futures:true,stocks:true,funding:true}),signal:AbortSignal.timeout(5000)});checks.push({path:"POST /api/admin/member-tools/1/restrictions (unauthenticated)",status:blockedMutation.status,valid:blockedMutation.status===403});
