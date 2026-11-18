@@ -25,3 +25,7 @@
 #platform .hfm-selected-stock>span:last-child{display:grid;gap:4px;min-width:0}
 #platform .hfm-selected-stock>span:last-child span{font-size:10px;color:#8295b1}
 #platform .trade-header .instrument{display:flex;align-items:center;gap:13px}
+
+#platform .hfm-account-status{margin:0 0 12px;padding:11px 15px;background:#fff;border:1px solid #dce7f4;border-left:3px solid #3766b9;border-radius:7px;display:flex;align-items:center;justify-content:space-between;gap:14px;font-size:12px;color:#526e94}
+#platform .hfm-account-status button{font-size:12px;flex-shrink:0;border:1px solid #cad9ee;border-radius:6px;background:#f5f8fe;color:#2857a4;cursor:pointer;padding:7px 12px}
+#platform [data-submit]:disabled{opacity:.48;cursor:not-allowed}
