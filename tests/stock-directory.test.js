@@ -3,7 +3,7 @@ const {test}=require("node:test"),assert=require("node:assert/strict");
 const dir=require("../stock-directory");
 test("KRX directory: HFM-style full symbol catalog, Korean search, paging, and validation",async()=>{
  const original=global.fetch;
- const data=Array.from({length:1250},(_,i)=>({"종목코드":String(i+1).padStart(6,"0"),"종목명":"테스트기업 "+i,mrktCtg:i%2?"KOSPI":"KOSDAQ"}));
+ const data=Array.from({length:1250},(_,i)=>({"종목코드":String(i+10001).padStart(6,"0"),"종목명":"테스트기업 "+i,mrktCtg:i%2?"KOSPI":"KOSDAQ"}));
  data.push({"종목코드":"005930","종목명":"삼성전자",mrktCtg:"KOSPI"});
  data.push({"종목코드":"000660","종목명":"SK하이닉스",mrktCtg:"KOSPI"});
  data.push({"종목코드":"1234","종목명":"유효하지 않은 코드",mrktCtg:"KOSPI"});
