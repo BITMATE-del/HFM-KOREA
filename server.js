@@ -250,6 +250,7 @@ http.createServer(async (req,res)=>{
     ok:status.code==="OK",stage,...status
    });
   }
+  if(url.pathname==="/vendor/lightweight-charts.js"){const vendor=path.join(root,"node_modules","lightweight-charts","dist","lightweight-charts.standalone.production.js");if(!fs.existsSync(vendor))return jsonResponse(res,503,{error:"CHART_LIBRARY_UNAVAILABLE"});res.writeHead(200,{"Content-Type":"application/javascript; charset=utf-8","Cache-Control":"public, max-age=86400","X-Content-Type-Options":"nosniff"});return fs.createReadStream(vendor).pipe(res)}
   const p=url.pathname==="/health"?"/health":url.pathname==="/"?"/index.html":url.pathname;
   let filepath=path.resolve(root,"."+decodeURIComponent(p));
   if(!filepath.startsWith(root+path.sep)){res.writeHead(403);return res.end("Forbidden")}

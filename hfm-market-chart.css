@@ -1,0 +1,9 @@
+/* Same lightweight-charts presentation approach as HFM KOREA margin stock screen. */
+#platform .chart-panel{min-height:620px!important;display:flex!important;flex-direction:column!important;overflow:hidden}
+#platform .chart-panel .hfm-market-chart-stage{flex:1 1 auto;display:block;min-height:490px!important;position:relative;overflow:hidden}
+#platform .hfm-market-chart{min-height:490px;width:100%;height:100%;position:relative;overflow:hidden;background:#fff}
+#platform .hfm-market-chart-canvas{height:100%;width:100%;min-height:490px}
+#platform .hfm-market-chart-status{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:#8393a9;font-size:12px;padding:28px;line-height:1.7}
+#platform .hfm-market-chart-foot{padding:9px 13px;min-height:31px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid #e8edf4;color:#7789a3;background:#fff;font-size:10px}
+#platform .hfm-market-chart-foot a{color:#7f90ac;text-decoration:none}
+@media(max-width:650px){#platform .chart-panel{min-height:475px!important}#platform .chart-panel .hfm-market-chart-stage,#platform .hfm-market-chart,#platform .hfm-market-chart-canvas{min-height:350px!important}#platform .hfm-market-chart-foot{font-size:9px;gap:6px}}
