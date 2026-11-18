@@ -111,12 +111,19 @@ async function route(req,res,url){
    return true;
   }
   if(path==="/api/admin/trading/orders"&&m==="GET"){
-   const q=await pool.query("SELECT o.*,u.username FROM hf_orders o JOIN hf_users u ON u.id=o.user_id ORDER BY o.id DESC LIMIT 200");
-   send(res,200,{executionEnabled:false,items:q.rows.map(x=>({...dto(x),username:x.username}))});return true;
+   const [q,stocks]=await Promise.all([
+    pool.query("SELECT o.*,u.username FROM hf_orders o JOIN hf_users u ON u.id=o.user_id ORDER BY o.id DESC LIMIT 200"),
+    pool.query("SELECT o.*,u.username FROM hf_stock_internal_orders o JOIN hf_users u ON u.id=o.user_id ORDER BY o.created_at DESC LIMIT 200")
+   ]);
+   const items=[...q.rows.map(x=>({...dto(x),username:x.username})),...stocks.rows.map(x=>({id:String(x.id),username:x.username,symbol:x.symbol.trim(),product:"STOCKS",side:x.side,type:"MARKET",qty:x.qty,limitPrice:Number(x.price_krw),status:"FILLED",createdAt:x.created_at}))].sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt)).slice(0,200);
+   send(res,200,{executionEnabled:false,items});return true;
   }
   if(path==="/api/admin/trading/positions"&&m==="GET"){
-   const q=await pool.query("SELECT p.*,u.username FROM hf_positions p JOIN hf_users u ON u.id=p.user_id ORDER BY p.id DESC LIMIT 200");
-   send(res,200,{items:q.rows.map(x=>({id:String(x.id),username:x.username,symbol:x.symbol,qty:x.qty,side:x.side,entry:Number(x.entry_price),state:x.state}))});return true;
+   const [q,stocks]=await Promise.all([
+    pool.query("SELECT p.*,u.username FROM hf_positions p JOIN hf_users u ON u.id=p.user_id ORDER BY p.id DESC LIMIT 200"),
+    pool.query("SELECT p.*,u.username FROM hf_stock_positions p JOIN hf_users u ON u.id=p.user_id WHERE p.qty>0 ORDER BY p.updated_at DESC LIMIT 200")
+   ]);
+   send(res,200,{items:[...q.rows.map(x=>({id:String(x.id),username:x.username,symbol:x.symbol,qty:x.qty,side:x.side,entry:Number(x.entry_price),state:x.state})),...stocks.rows.map(x=>({id:"STOCK:"+x.user_id+":"+x.symbol.trim(),username:x.username,symbol:x.symbol.trim(),qty:Number(x.qty),side:"BUY",entry:Number(x.cost_krw)/Number(x.qty),state:"OPEN"}))]});return true;
   }
   send(res,404,{error:"NOT_FOUND"});return true;
  }catch(e){console.error("TRADING_API_ERROR",String(e.message).slice(0,100));const known=["INVALID_JSON","BODY_TOO_LARGE"].includes(e.message);send(res,known?400:503,{error:known?e.message:"SERVICE_UNAVAILABLE"});return true}
