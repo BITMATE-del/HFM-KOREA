@@ -22,6 +22,11 @@ async function route(req,res,url){
   const u=await auth(req);if(!u){send(res,401,{error:"LOGIN_REQUIRED"});return true}
   if(path.startsWith("/api/admin/")&&u.role!=="ADMIN"){send(res,403,{error:"ADMIN_REQUIRED"});return true}
   const m=req.method,b=m==="POST"?await read(req):{};
+  if(!admin&&m==="POST"&&path.startsWith("/api/trading/orders")){
+   const blocked=await pool.query("SELECT futures_blocked,stocks_blocked FROM hf_member_restrictions WHERE user_id=$1",[u.id]);
+   const x=blocked.rows[0],spec=instruments[String(b.symbol||"").toUpperCase()];
+   if((x?.futures_blocked&&spec?.[0]==="FUTURES")||(x?.stocks_blocked&&spec?.[0]==="STOCKS")){send(res,403,{error:"TRADING_RESTRICTED"});return true}
+  }
   if(path==="/api/trading/state"&&m==="GET"){
    const [orders,positions,fills,wallet]=await Promise.all([
     pool.query("SELECT * FROM hf_orders WHERE user_id=$1 ORDER BY id DESC LIMIT 150",[u.id]),

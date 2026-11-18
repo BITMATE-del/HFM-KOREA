@@ -31,6 +31,10 @@ async function route(req,res,url){
   const isAdmin=p.startsWith("/api/admin/");
   if(isAdmin&&u.role!=="ADMIN"){json(res,403,{error:"ADMIN_REQUIRED"});return true}
   const b=req.method==="POST"?await read(req):{};
+  if(!isAdmin&&req.method==="POST"&&p==="/api/wallet/requests"){
+   const flag=await pool.query("SELECT funding_blocked FROM hf_member_restrictions WHERE user_id=$1",[u.id]);
+   if(flag.rows[0]?.funding_blocked){json(res,403,{error:"FUNDING_RESTRICTED"});return true}
+  }
   if(p==="/api/wallet/status"&&req.method==="GET"){
    await pool.query("INSERT INTO hf_wallets(user_id) VALUES($1) ON CONFLICT(user_id) DO NOTHING",[u.id]);
    const r=(await pool.query("SELECT futures_balance,stocks_balance,updated_at FROM hf_wallets WHERE user_id=$1",[u.id])).rows[0];
