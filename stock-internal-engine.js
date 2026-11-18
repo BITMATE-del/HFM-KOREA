@@ -159,6 +159,14 @@ async function route(req,res,url,quoteProvider){
   let b;try{b=JSON.parse(text)}catch{fail("INVALID_JSON")}
   const o=checkOrder(b);
   if(!allowed()){send(res,503,{error:"STOCK_INTERNAL_EXECUTION_DISABLED"});return true}
+  const duplicate=await pool.query("SELECT user_id,symbol,side,qty,price_krw,gross_krw FROM hf_stock_internal_orders WHERE id=$1",[o.id]);
+  if(duplicate.rowCount){
+   const row=duplicate.rows[0];
+   if(String(row.user_id)!==String(user.id)||row.symbol.trim()!==o.symbol||row.side!==o.side||Number(row.qty)!==o.qty){
+    send(res,409,{error:"IDEMPOTENCY_CONFLICT"});return true;
+   }
+   send(res,200,{ok:true,id:o.id,duplicate:true,executionMode:"INTERNAL_MARKET_REFERENCE",priceKrw:Number(row.price_krw),grossKrw:String(row.gross_krw)});return true;
+  }
   const listed=await directory.find(o.symbol);
   if(!listed){send(res,404,{error:"STOCK_NOT_LISTED"});return true}
   const quote=await quoteProvider(o.symbol);
