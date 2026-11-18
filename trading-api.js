@@ -2,6 +2,7 @@
 const core=require("./app-api"),funding=require("./funding-api");
 const {pool,auth}=core;
 const stockDirectory=require("./stock-directory");
+const stockEngine=require("./stock-internal-engine");
 const instruments={NQ:["FUTURES",.25],MNQ:["FUTURES",.25],ES:["FUTURES",.25],MES:["FUTURES",.25],GC:["FUTURES",.1],MGC:["FUTURES",.1],CL:["FUTURES",.01],"005930":["STOCKS",1],"000660":["STOCKS",1],"035420":["STOCKS",1],"005380":["STOCKS",1]};
 const SQL=[
 "CREATE TABLE IF NOT EXISTS hf_orders(id BIGSERIAL PRIMARY KEY,user_id BIGINT NOT NULL REFERENCES hf_users(id) ON DELETE CASCADE,request_key UUID NOT NULL,symbol VARCHAR(12) NOT NULL,product VARCHAR(12) NOT NULL CHECK(product IN ('FUTURES','STOCKS')),side VARCHAR(4) NOT NULL CHECK(side IN ('BUY','SELL')),order_type VARCHAR(8) NOT NULL CHECK(order_type IN ('LIMIT','MARKET')),qty INTEGER NOT NULL CHECK(qty>0 AND qty<=100),limit_price NUMERIC(18,5),status VARCHAR(12) NOT NULL DEFAULT 'HELD' CHECK(status IN ('HELD','CANCELLED','FILLED','REJECTED')),reason VARCHAR(80) NOT NULL DEFAULT 'MARKET_DATA_NOT_AVAILABLE',created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(user_id,request_key))",
@@ -30,13 +31,19 @@ async function route(req,res,url){
    if((x?.futures_blocked&&spec?.[0]==="FUTURES")||(x?.stocks_blocked&&spec?.[0]==="STOCKS")){send(res,403,{error:"TRADING_RESTRICTED"});return true}
   }
   if(path==="/api/trading/state"&&m==="GET"){
-   const [orders,positions,fills,wallet]=await Promise.all([
+   const [orders,positions,fills,wallet,internalStocks]=await Promise.all([
     pool.query("SELECT * FROM hf_orders WHERE user_id=$1 ORDER BY id DESC LIMIT 150",[u.id]),
     pool.query("SELECT * FROM hf_positions WHERE user_id=$1 ORDER BY id DESC LIMIT 150",[u.id]),
     pool.query("SELECT * FROM hf_fills WHERE user_id=$1 ORDER BY id DESC LIMIT 150",[u.id]),
-    pool.query("SELECT futures_balance,stocks_balance FROM hf_wallets WHERE user_id=$1",[u.id])
+    pool.query("SELECT futures_balance,stocks_balance FROM hf_wallets WHERE user_id=$1",[u.id]),
+    stockEngine.state(u.id)
    ]);
-   send(res,200,{executionEnabled:false,marketDataReady:false,orders:orders.rows.map(dto),positions:positions.rows.map(x=>({id:String(x.id),symbol:x.symbol,side:x.side,qty:x.qty,entry:Number(x.entry_price),product:x.product,state:x.state})),fills:fills.rows.map(x=>({id:String(x.id),symbol:x.symbol,qty:x.qty,price:Number(x.price),feeKrw:String(x.fee_krw)})),wallet:{futuresBalance:String(wallet.rows[0]?.futures_balance||0),stocksBalance:String(wallet.rows[0]?.stocks_balance||0)}});return true;
+   const stockOrders=internalStocks.orders.map(o=>({id:o.id,symbol:o.symbol,product:"STOCKS",side:o.side,type:"MARKET",qty:o.qty,limitPrice:null,status:"FILLED",reason:"INTERNAL_MARKET_REFERENCE",createdAt:o.createdAt,updatedAt:o.createdAt,fillPrice:o.priceKrw,realizedPnlKrw:o.realizedPnlKrw,feeKrw:o.feeKrw}));
+   const stockPositions=internalStocks.positions.map(p=>({id:"STOCK:"+p.symbol,symbol:p.symbol,product:"STOCKS",side:"BUY",qty:p.qty,entry:p.avgPrice,costKrw:p.costKrw,state:"OPEN",openedAt:p.updatedAt}));
+   send(res,200,{executionEnabled:false,internalStockExecutionEnabled:internalStocks.enabled,marketDataReady:false,
+    orders:[...stockOrders,...orders.rows.map(dto)],positions:[...stockPositions,...positions.rows.map(x=>({id:String(x.id),symbol:x.symbol,side:x.side,qty:x.qty,entry:Number(x.entry_price),product:x.product,state:x.state}))],
+    fills:fills.rows.map(x=>({id:String(x.id),symbol:x.symbol,qty:x.qty,price:Number(x.price),feeKrw:String(x.fee_krw)})),
+    wallet:{futuresBalance:String(wallet.rows[0]?.futures_balance||0),stocksBalance:String(wallet.rows[0]?.stocks_balance||0)}});return true;
   }
   if(path==="/api/trading/risk-preview"&&m==="GET"){
    const symbol=String(url.searchParams.get("symbol")||"").toUpperCase();
