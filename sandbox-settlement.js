@@ -83,15 +83,30 @@ async function rollbackSmoke(pool){
  try{
   await c.query("BEGIN");
   await c.query("INSERT INTO hf_lab_accounts(id,balance_krw) VALUES($1,$2)",[accountId,10000000]);
-  const opened=await executeInTransaction(c,{accountId,requestKey:randomUUID(),action:"OPEN",symbol:"NQ",side:"BUY",qty:1,price:22000,fxKrw:1400});
+  const openingRequestKey=randomUUID();
+  const opened=await executeInTransaction(c,{accountId,requestKey:openingRequestKey,action:"OPEN",symbol:"NQ",side:"BUY",qty:1,price:22000,fxKrw:1400});
   requireValue(opened.accountBalanceKrw===9998500&&opened.marginReservedKrw===3000000,"OPEN_ACCOUNTING_FAILED");
+  const retry=await executeInTransaction(c,{accountId,requestKey:openingRequestKey,action:"OPEN",symbol:"NQ",side:"BUY",qty:1,price:22000,fxKrw:1400});
+  requireValue(retry.duplicate===true&&retry.orderId===opened.orderId,"IDEMPOTENT_RETRY_FAILED");
+  let insufficient=false;
+  try{await executeInTransaction(c,{accountId,requestKey:randomUUID(),action:"OPEN",symbol:"NQ",side:"BUY",qty:5,price:22000,fxKrw:1400})}
+  catch(e){insufficient=e.code==="INSUFFICIENT_MARGIN";if(!insufficient)throw e}
+  requireValue(insufficient,"INSUFFICIENT_MARGIN_NOT_BLOCKED");
+  let excessiveLoss=false;
+  try{await executeInTransaction(c,{accountId,requestKey:randomUUID(),action:"CLOSE",symbol:"NQ",side:"BUY",qty:1,price:21000,fxKrw:1400,positionId:opened.positionId})}
+  catch(e){excessiveLoss=e.code==="INSUFFICIENT_SETTLEMENT_BALANCE";if(!excessiveLoss)throw e}
+  requireValue(excessiveLoss,"OVERLOSS_NOT_BLOCKED");
   const closed=await executeInTransaction(c,{accountId,requestKey:randomUUID(),action:"CLOSE",symbol:"NQ",side:"BUY",qty:1,price:22001,fxKrw:1400,positionId:opened.positionId});
   requireValue(closed.changeKrw===26500&&closed.accountBalanceKrw===10025000,"CLOSE_ACCOUNTING_FAILED");
   const ledger=await c.query("SELECT change_krw,balance_after_krw FROM hf_lab_ledger WHERE account_id=$1 ORDER BY id",[accountId]);
   requireValue(ledger.rowCount===2&&Number(ledger.rows[0].change_krw)===-1500&&Number(ledger.rows[1].change_krw)===26500,"LEDGER_MISMATCH");
   const position=await c.query("SELECT state FROM hf_lab_positions WHERE id=$1",[opened.positionId]);
   requireValue(position.rows[0].state==="CLOSED","POSITION_NOT_CLOSED");
-  return {ok:true,events:2,rolledBack:true,openFeeKrw:1500,closeNetKrw:26500};
+  let secondClose=false;
+  try{await executeInTransaction(c,{accountId,requestKey:randomUUID(),action:"CLOSE",symbol:"NQ",side:"BUY",qty:1,price:22002,fxKrw:1400,positionId:opened.positionId})}
+  catch(e){secondClose=e.code==="POSITION_NOT_OPEN";if(!secondClose)throw e}
+  requireValue(secondClose,"DUPLICATE_CLOSE_NOT_BLOCKED");
+  return {ok:true,events:2,rolledBack:true,openFeeKrw:1500,closeNetKrw:26500,idempotentRetry:true,insufficientMarginBlocked:true,overlossBlocked:true,duplicateCloseBlocked:true};
  }finally{await c.query("ROLLBACK").catch(()=>{});c.release()}
 }
 module.exports={initSchema,executeInTransaction,execute,rollbackSmoke,DDL};
