@@ -6,7 +6,7 @@ test("KRX directory: HFM-style full symbol catalog, Korean search, paging, and v
  const data=Array.from({length:1250},(_,i)=>({"종목코드":String(i+10001).padStart(6,"0"),"종목명":"테스트기업 "+i,mrktCtg:i%2?"KOSPI":"KOSDAQ"}));
  data.push({"종목코드":"005930","종목명":"삼성전자",mrktCtg:"KOSPI"});
  data.push({"종목코드":"000660","종목명":"SK하이닉스",mrktCtg:"KOSPI"});
- data.push({"종목코드":"1234","종목명":"유효하지 않은 코드",mrktCtg:"KOSPI"});
+ data.push({"종목코드":"ZZZZ","종목명":"유효하지 않은 코드",mrktCtg:"KOSPI"});
  data.push({"종목코드":"987654","종목명":"상장 외 종목",mrktCtg:"UNKNOWN"});
  let requests=0;
  global.fetch=async url=>{requests++;assert.match(String(url),/aikstockdata\.com\/data\/public\/quotes\.json/);return {ok:true,json:async()=>({items:data})}};
