@@ -171,7 +171,7 @@ async function stockQuote(code){
  });
 }
 async function stockCandles(code,period){
- const sizes={minute1:1,minute5:5,minute15:15,minute60:60,day:0,week:0,month:0};
+ const sizes={minute1:1,minute3:3,minute5:5,minute15:15,minute60:60,day:0,week:0,month:0,year:0};
  if(!Object.prototype.hasOwnProperty.call(sizes,period))throw Error("INVALID_PERIOD");
  const size=sizes[period];
  return stockCached("c:"+code+":"+period,size?45000:300000,async()=>{
@@ -186,6 +186,15 @@ async function stockCandles(code,period){
     bars.push({time:date.slice(0,4)+"-"+date.slice(4,6)+"-"+date.slice(6,8),open,high,low,close,volume});
    }
    if(!bars.length)throw Error("STOCK_CHART_EMPTY");
+   if(period==="year"){
+    const aggregated=new Map();
+    for(const bar of bars){
+     const year=bar.time.slice(0,4)+"-01-01",prev=aggregated.get(year);
+     if(!prev)aggregated.set(year,{time:year,open:bar.open,high:bar.high,low:bar.low,close:bar.close,volume:bar.volume});
+     else{prev.high=Math.max(prev.high,bar.high);prev.low=Math.min(prev.low,bar.low);prev.close=bar.close;prev.volume+=bar.volume}
+    }
+    return {symbol:code,period,source:"NAVER_MONTHLY_AGGREGATED",approximateOHLC:false,candles:[...aggregated.values()].slice(-100),asOf:new Date().toISOString()};
+   }
    return {symbol:code,period,source:"NAVER_DAILY_UNOFFICIAL",approximateOHLC:false,candles:bars.slice(-1200),asOf:new Date().toISOString()};
   }
   const xml=await stockHttp("https://fchart.stock.naver.com/sise.nhn?symbol="+code+"&timeframe=minute&count=3000&requestType=0","application/xml");
@@ -221,6 +230,24 @@ http.createServer(async (req,res)=>{
    try{return jsonResponse(res,200,await stockDirectory.search(url.searchParams.get("q")||"",url.searchParams.get("page")||1))}
    catch(e){console.warn("STOCK_CATALOG_ERROR",String(e.message).slice(0,55));return jsonResponse(res,503,{error:"STOCK_CATALOG_UNAVAILABLE"})}
   }
+  if(url.pathname==="/api/stocks/details"){
+   if(req.method!=="GET")return jsonResponse(res,405,{error:"METHOD_NOT_ALLOWED"});
+   const code=url.searchParams.get("symbol")||"";
+   if(!STOCK_CODE.test(code))return jsonResponse(res,400,{error:"INVALID_SYMBOL"});
+   try{
+    const listed=await stockDirectory.find(code);
+    if(!listed)return jsonResponse(res,404,{error:"STOCK_SYMBOL_NOT_LISTED"});
+    const [q,d]=await Promise.allSettled([stockQuote(code),stockCandles(code,"day")]);
+    const quote=q.status==="fulfilled"?q.value:null,history=d.status==="fulfilled"?d.value.candles:[];
+    if(!quote&&!history.length)return jsonResponse(res,503,{error:"STOCK_DETAIL_UNAVAILABLE"});
+    const last=history[history.length-1],high52=history.slice(-252).reduce((m,x)=>Math.max(m,x.high),0),low52=history.slice(-252).reduce((m,x)=>Math.min(m,x.low),Number.MAX_VALUE);
+    return jsonResponse(res,200,{symbol:code,name:listed.name,market:listed.market,source:"NAVER_PUBLIC",asOf:quote?.asOf||last?.time||null,
+     price:quote?.price??last?.close??null,previousClose:quote?.previousClose??null,
+     open:last?.open??null,high:last?.high??null,low:last?.low??null,volume:last?.volume??null,
+     high52:history.length?high52:null,low52:history.length?low52:null,
+     marketCap:null,per:null,pbr:null,tradingValue:null,listedShares:null,eps:null,bps:null,tradeable:false});
+   }catch(e){console.warn("STOCK_DETAILS_ERROR",String(e.message).slice(0,70));return jsonResponse(res,503,{error:"STOCK_DETAIL_UNAVAILABLE"})}
+  }
   if(url.pathname==="/api/stocks/quote"||url.pathname==="/api/stocks/intraday"){
    if(req.method!=="GET")return jsonResponse(res,405,{error:"METHOD_NOT_ALLOWED"});
    const symbol=url.searchParams.get("symbol")||"";
@@ -228,7 +255,7 @@ http.createServer(async (req,res)=>{
    try{if(!await stockDirectory.find(symbol))return jsonResponse(res,404,{error:"STOCK_SYMBOL_NOT_LISTED"})}
    catch{return jsonResponse(res,503,{error:"STOCK_CATALOG_UNAVAILABLE"})}
    const period=url.searchParams.get("period")||"minute1";
-   if(url.pathname.endsWith("/intraday")&&!["minute1","minute5","minute15","minute60","day","week","month"].includes(period))return jsonResponse(res,400,{error:"INVALID_PERIOD"});
+   if(url.pathname.endsWith("/intraday")&&!["minute1","minute3","minute5","minute15","minute60","day","week","month","year"].includes(period))return jsonResponse(res,400,{error:"INVALID_PERIOD"});
    try{
     const output=url.pathname.endsWith("/quote")?await stockQuote(symbol):await stockCandles(symbol,period);
     return jsonResponse(res,200,output);
