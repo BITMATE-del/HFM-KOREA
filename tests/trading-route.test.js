@@ -24,7 +24,7 @@ function build(role="MEMBER"){
  const core={pool,auth:async()=>({id:"44",role,username:"tester"}),ensureReady:async()=>{}};
  const funding={ensure:async()=>{}};
  const mod={exports:{}};
- vm.runInNewContext(source,{module:mod,require:x=>x==="./app-api"?core:x==="./funding-api"?funding:x==="./stock-directory"?{find:async(code)=>({code,name:"테스트 종목",market:"KOSPI"})}:require(x),console,Buffer,Date,Number,String,Object,BigInt,Math,RegExp,Error,setTimeout},{filename:"trading-api.js"});
+ vm.runInNewContext(source,{module:mod,require:x=>x==="./app-api"?core:x==="./funding-api"?funding:x==="./stock-directory"?{find:async(code)=>({code,name:"테스트 종목",market:"KOSPI"})}:x==="./stock-internal-engine"?{state:async()=>({enabled:false,orders:[],positions:[]})}:require(x),console,Buffer,Date,Number,String,Object,BigInt,Math,RegExp,Error,setTimeout},{filename:"trading-api.js"});
  return {route:mod.exports.route,calls};
 }
 async function request(route,path,method="GET",body){
