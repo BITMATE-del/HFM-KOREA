@@ -61,7 +61,10 @@ const projection=u=>({id:String(u.id),username:u.username,name:u.full_name,phone
 async function auth(req){
  const token=cookie(req);if(!/^[a-f0-9]{64}$/.test(token))return null;
  const q=await pool.query("SELECT u.id,u.username,u.full_name,u.phone,u.referral,u.role,u.status,u.created_at FROM hf_sessions s JOIN hf_users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW() AND u.status='ACTIVE'",[hash(token)]);
- return q.rows[0]||null;
+ const row=q.rows[0]||null;
+ if(!row)return null;
+ const blocked=await pool.query("SELECT login_blocked FROM hf_member_restrictions WHERE user_id=$1",[row.id]);
+ return blocked.rows[0]?.login_blocked?null:row;
 }
 const attempts=new Map();
 const attemptKey=(req,id)=>req.socket.remoteAddress+":"+id;
@@ -114,6 +117,8 @@ async function route(req,res,url){
    const row=(await pool.query("SELECT * FROM hf_users WHERE username=$1",[id])).rows[0];
    if(!row||!await verify(pwd,row.password_hash)){fail(req,id);send(res,401,{error:"INVALID_LOGIN"});return true}
    if(row.status!=="ACTIVE"){send(res,403,{error:"ACCOUNT_FROZEN"});return true}
+   const blocked=await pool.query("SELECT login_blocked FROM hf_member_restrictions WHERE user_id=$1",[row.id]);
+   if(blocked.rows[0]?.login_blocked){send(res,403,{error:"ACCOUNT_FROZEN"});return true}
    const token=randomBytes(32).toString("hex");
    await pool.query("INSERT INTO hf_sessions(token_hash,user_id,expires_at) VALUES($1,$2,NOW()+INTERVAL '7 days')",[hash(token),row.id]);
    send(res,200,{ok:true,user:projection(row)},{"Set-Cookie":cookieHeader(token)});return true;
@@ -194,4 +199,4 @@ async function route(req,res,url){
   send(res,["INVALID_JSON","BODY_TOO_LARGE"].includes(message)?400:503,{error:["INVALID_JSON","BODY_TOO_LARGE"].includes(message)?message:"SERVICE_UNAVAILABLE"});return true;
  }
 }
-module.exports={route,ensureReady,pool,auth,audit};
+module.exports={route,ensureReady,pool,auth,audit,passHash,encryptAccount,parseBirthday};
