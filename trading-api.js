@@ -83,6 +83,14 @@ async function route(req,res,url){
     await c.query("COMMIT");send(res,200,{ok:true,order:dto(q.rows[0])});return true;
    }catch(e){await c.query("ROLLBACK").catch(()=>{});throw e}finally{c.release()}
   }
+  if(path==="/api/admin/trading/reconciliation"&&m==="GET"){
+   const [counts,anomalies]=await Promise.all([
+    pool.query("SELECT (SELECT COUNT(*)::int FROM hf_orders WHERE status='HELD') AS held_orders,(SELECT COUNT(*)::int FROM hf_orders WHERE status='FILLED') AS filled_orders,(SELECT COUNT(*)::int FROM hf_positions WHERE state='OPEN') AS open_positions,(SELECT COUNT(*)::int FROM hf_fills) AS recorded_fills,(SELECT COUNT(*)::int FROM hf_fills f LEFT JOIN hf_orders o ON o.id=f.order_id WHERE o.id IS NULL OR o.status<>'FILLED') AS inconsistent_fills"),
+    pool.query("SELECT w.user_id,u.username,w.futures_balance,w.stocks_balance,COALESCE(l.futures,0)::bigint AS ledger_futures,COALESCE(l.stocks,0)::bigint AS ledger_stocks FROM hf_wallets w JOIN hf_users u ON u.id=w.user_id LEFT JOIN (SELECT user_id,SUM(delta) FILTER(WHERE account='FUTURES') AS futures,SUM(delta) FILTER(WHERE account='STOCKS') AS stocks FROM hf_wallet_ledger GROUP BY user_id) l ON l.user_id=w.user_id WHERE w.futures_balance<>COALESCE(l.futures,0) OR w.stocks_balance<>COALESCE(l.stocks,0) ORDER BY w.user_id LIMIT 50")
+   ]);
+   send(res,200,{executionEnabled:false,summary:counts.rows[0],walletMismatchCount:anomalies.rowCount,affectedUsers:anomalies.rows.map(x=>({userId:String(x.user_id),username:x.username,futuresBalance:String(x.futures_balance),stocksBalance:String(x.stocks_balance),ledgerFutures:String(x.ledger_futures),ledgerStocks:String(x.ledger_stocks)})),warning:anomalies.rowCount===50?"LIMIT_REACHED":"NONE"});
+   return true;
+  }
   if(path==="/api/admin/trading/orders"&&m==="GET"){
    const q=await pool.query("SELECT o.*,u.username FROM hf_orders o JOIN hf_users u ON u.id=o.user_id ORDER BY o.id DESC LIMIT 200");
    send(res,200,{executionEnabled:false,items:q.rows.map(x=>({...dto(x),username:x.username}))});return true;
