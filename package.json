@@ -4,7 +4,8 @@
   "private": true,
   "description": "HFM KOREA overseas futures web interface",
   "scripts": {
-    "start": "node server.js"
+    "start": "npm test && node server.js",
+    "test": "node --test tests/*.test.js"
   },
   "engines": {
     "node": ">=20"

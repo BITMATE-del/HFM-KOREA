@@ -31,6 +31,26 @@ async function route(req,res,url){
    ]);
    send(res,200,{executionEnabled:false,marketDataReady:false,orders:orders.rows.map(dto),positions:positions.rows.map(x=>({id:String(x.id),symbol:x.symbol,side:x.side,qty:x.qty,entry:Number(x.entry_price),product:x.product,state:x.state})),fills:fills.rows.map(x=>({id:String(x.id),symbol:x.symbol,qty:x.qty,price:Number(x.price),feeKrw:String(x.fee_krw)})),wallet:{futuresBalance:String(wallet.rows[0]?.futures_balance||0),stocksBalance:String(wallet.rows[0]?.stocks_balance||0)}});return true;
   }
+  if(path==="/api/trading/risk-preview"&&m==="GET"){
+   const symbol=String(url.searchParams.get("symbol")||"").toUpperCase();
+   const qty=Number(url.searchParams.get("qty")||"");
+   if(!instruments[symbol]||!Number.isSafeInteger(qty)||qty<1||qty>100){send(res,400,{error:"INVALID_RISK_INPUT"});return true}
+   if(instruments[symbol][0]!=="FUTURES"){send(res,400,{error:"FUTURES_ONLY"});return true}
+   const calc=require("./settlement-core");
+   const [balance,withdrawals,positions]=await Promise.all([
+    pool.query("SELECT futures_balance FROM hf_wallets WHERE user_id=$1",[u.id]),
+    pool.query("SELECT COALESCE(SUM(amount),0)::bigint AS total FROM hf_funding_requests WHERE user_id=$1 AND account='FUTURES' AND kind='WITHDRAW' AND status='PENDING'",[u.id]),
+    pool.query("SELECT symbol,qty FROM hf_positions WHERE user_id=$1 AND product='FUTURES' AND state='OPEN'",[u.id])
+   ]);
+   const locked=positions.rows.reduce((sum,p)=>sum+calc.marginFor(p.symbol,p.qty),0);
+   const cash=Number(balance.rows[0]?.futures_balance||0),pending=Number(withdrawals.rows[0]?.total||0);
+   const available=calc.availableMargin({balanceKrw:cash,lockedKrw:locked,pendingWithdrawalsKrw:pending});
+   const margin=calc.marginFor(symbol,qty),estimatedFee=calc.feesFor(qty);
+   send(res,200,{symbol,qty,balanceKrw:String(cash),lockedMarginKrw:String(locked),pendingWithdrawalKrw:String(pending),
+    availableKrw:String(available),marginRequiredKrw:String(margin),estimatedFeeKrw:String(estimatedFee),
+    enoughBalance:available>=margin+estimatedFee,canExecute:false,reason:"LIVE_PRICE_AND_SETTLEMENT_DISABLED"});
+   return true;
+  }
   if(path==="/api/trading/orders"&&m==="POST"){
    const symbol=String(b.symbol||"").toUpperCase(),spec=instruments[symbol],side=String(b.side||""),type=String(b.type||"").toUpperCase(),qty=Number(b.qty),limit=Number(b.limitPrice),key=String(b.requestKey||"");
    if(!spec||!["BUY","SELL"].includes(side)||!["LIMIT","MARKET"].includes(type)||!Number.isSafeInteger(qty)||qty<1||qty>100||!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(key)){send(res,400,{error:"INVALID_ORDER"});return true}
