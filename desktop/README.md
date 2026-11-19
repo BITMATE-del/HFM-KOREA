@@ -1,4 +1,4 @@
-# VELTRO HTS — Windows 데스크톱
+# HFM KOREA HTS — Windows 데스크톱
 
 현재 `HFM-KOREA` 운영 WTS를 기반으로 실행하는 Windows 데스크톱 HTS 1차 버전입니다.
 데스크톱 앱과 서버 체결엔진은 분리되어 있습니다. 기존 회원정보·시세·주문 API를
@@ -32,11 +32,11 @@ npm run dist:win
 ```
 
 출력 파일:
-- `dist/VELTRO-HTS-Setup-0.1.0-x64.exe` — 설치형
-- `dist/VELTRO-HTS-Portable-0.1.0-x64.exe` — 무설치형
+- `dist/HFM-KOREA-HTS-Setup-0.1.0-x64.exe` — 설치형
+- `dist/HFM-KOREA-HTS-Portable-0.1.0-x64.exe` — 무설치형
 
-GitHub Actions의 **VELTRO HTS Windows** 워크플로가 윈도우 빌드를
-수행한 후 `VELTRO-HTS-Windows`라는 빌드 아티팩트로 EXE를 보관합니다.
+GitHub Actions의 **HFM KOREA HTS Windows** 워크플로가 윈도우 빌드를
+수행한 후 `HFM-KOREA-HTS-Windows`라는 빌드 아티팩트로 EXE를 보관합니다.
 커밋 또는 수동 실행으로 빌드하며 웹 Railway 운영 서버를 재배포하지 않습니다.
 
 ## 배포·운영 참고
