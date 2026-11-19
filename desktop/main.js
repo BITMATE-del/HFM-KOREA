@@ -13,6 +13,23 @@ const panes=new Map(),positions={chart:null,order:null,positions:null};
 const popouts=new Set();
 let authTimer=null;
 let updaterControl={enabled:false};
+let promptedVersion="";
+function updateNotice(name,state){
+ send(name,state);
+ if(name!=="hts:update"||state?.status!=="downloaded"||!windowRef||windowRef.isDestroyed())return;
+ const version=state.latest||"new";
+ if(promptedVersion===version)return;
+ promptedVersion=version;
+ dialog.showMessageBox(windowRef,{
+  type:"info",title:"HFM KOREA HTS 업데이트",
+  message:"새로운 버전 v"+version+"의 다운로드가 완료되었습니다.",
+  detail:"지금 재시작하면 업데이트를 적용합니다. 나중에 선택하면 거래 화면을 계속 이용할 수 있습니다. 정상 종료 시 업데이트가 적용될 수 있습니다.",
+  buttons:["지금 재시작","나중에"],defaultId:1,cancelId:1,noLink:true
+ }).then(result=>{
+  if(result.response===0)updaterControl.install?.();
+ }).catch(e=>console.warn("HTS update prompt:",e.message));
+}
+
 
 function send(name,value){
  if(windowRef&&!windowRef.isDestroyed()&&!windowRef.webContents.isDestroyed())windowRef.webContents.send(name,value);
@@ -284,7 +301,7 @@ app.whenReady().then(()=>{
  loadWorkspace();
  try{
   const {autoUpdater}=require("electron-updater");
-  updaterControl=initAutoUpdate({app,send,autoUpdater});
+  updaterControl=initAutoUpdate({app,send:updateNotice,autoUpdater});
  }catch(error){
   console.warn("HTS update initialization skipped:",String(error?.message||error).slice(0,100));
   send("hts:update",{status:"error",message:"업데이트 서비스에 연결할 수 없습니다.",version:app.getVersion()});
