@@ -234,3 +234,17 @@ button,input,select,textarea{font-family:inherit!important}
  #platform .trading-layout.stock-no-orderbook .order-body .order-info,
  #platform .trading-layout.stock-no-orderbook .order-body .trade-buttons{grid-column:1!important}
 }
+
+/* Domestic stock order form: separate quantity shortcuts, totals and actions. */
+#platform .trading-layout.stock-no-orderbook .order-fields{margin-bottom:16px!important}
+#platform .trading-layout.stock-no-orderbook .order-fields .quick-buttons{margin-top:10px!important}
+#platform .trading-layout.stock-no-orderbook .order-info{margin-top:0!important;margin-bottom:16px!important}
+@media(max-width:760px){
+ #platform .trading-layout.stock-no-orderbook .order-fields{margin-bottom:0!important}
+ #platform .trading-layout.stock-no-orderbook .order-info{margin-bottom:0!important}
+ #platform .trading-layout.stock-no-orderbook .trade-buttons{margin-top:4px!important}
+}
+@media(max-width:390px){
+ #platform .trading-layout.stock-no-orderbook .order-fields{margin-bottom:10px!important}
+ #platform .trading-layout.stock-no-orderbook .order-info{margin-bottom:10px!important}
+}
