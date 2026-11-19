@@ -146,6 +146,27 @@ async function rollbackSmoke(){
   return {ok:true,bought:10,sold:4,remaining:6,ledger:2,duplicateBlocked:true,insufficientFundsBlocked:true,oversellBlocked:true,conflictingRetryBlocked:true,rolledBack:true};
  }finally{await c.query("ROLLBACK").catch(()=>{});c.release()}
 }
+// Rollback-only verification against the production quote provider; no user data persists.
+async function rollbackLiveQuoteSmoke(provider){
+ await ensure();
+ const quote=await provider("005930");
+ const verified=checkQuote({...quote,tradeable:true});
+ const c=await pool.connect();
+ try{
+  await c.query("BEGIN");
+  const member=await c.query("INSERT INTO hf_users(username,password_hash,full_name,phone) VALUES($1,'SMOKE_NO_LOGIN','검증','00000000000') RETURNING id",["smoke_live_"+crypto.randomBytes(8).toString("hex")]);
+  const userId=member.rows[0].id;
+  await c.query("INSERT INTO hf_wallets(user_id,stocks_balance) VALUES($1,$2)",[userId,1000000000]);
+  const key=crypto.randomUUID();
+  const buy=await transact(c,userId,{symbol:"005930",side:"BUY",qty:1,requestKey:key},{...quote,tradeable:true});
+  if(!buy.id||buy.priceKrw!==verified.price||buy.balanceKrw!==String(1000000000-verified.price))fail("LIVE_QUOTE_BUY_MISMATCH");
+  const replay=await transact(c,userId,{symbol:"005930",side:"BUY",qty:1,requestKey:key},{...quote,tradeable:true});
+  if(!replay.duplicate)fail("LIVE_QUOTE_RETRY_MISMATCH");
+  const sold=await transact(c,userId,{symbol:"005930",side:"SELL",qty:1,requestKey:crypto.randomUUID()},{...quote,tradeable:true});
+  if(sold.realizedPnlKrw!=="0"||sold.balanceKrw!=="1000000000")fail("LIVE_QUOTE_SELL_MISMATCH");
+  return {ok:true,rolledBack:true,source:verified.source,price:verified.price,sideCount:2};
+ }finally{await c.query("ROLLBACK").catch(()=>{});c.release()}
+}
 async function route(req,res,url,quoteProvider){
  const p=url.pathname;
  if(p!=="/api/stocks/internal")return false;
@@ -180,8 +201,9 @@ async function route(req,res,url,quoteProvider){
  }catch(e){
   const errors=new Set(["INVALID_STOCK_ORDER","INVALID_BODY","INVALID_JSON","ORDER_TOO_LARGE","IDEMPOTENCY_CONFLICT","INSUFFICIENT_BALANCE","INSUFFICIENT_SHARES","STOCK_TRADING_RESTRICTED","MARKET_CLOSED","REFERENCE_QUOTE_STALE","REFERENCE_QUOTE_UNAVAILABLE","QUOTE_ENTITLEMENT_REQUIRED"]);
   const code=e.code||e.message;const status=code==="INSUFFICIENT_BALANCE"||code==="INSUFFICIENT_SHARES"||code==="IDEMPOTENCY_CONFLICT"?409:code==="STOCK_TRADING_RESTRICTED"?403:code==="MARKET_CLOSED"||code==="REFERENCE_QUOTE_STALE"||code==="REFERENCE_QUOTE_UNAVAILABLE"||code==="QUOTE_ENTITLEMENT_REQUIRED"?503:errors.has(code)?400:503;
+  console.warn("HFM_STOCK_ORDER_REJECTED",JSON.stringify({code:errors.has(code)?code:"STOCK_EXECUTION_FAILED",status}));
   if(!errors.has(code))console.error("HFM_STOCK_ENGINE_ERROR",String(e.message).slice(0,90));
   send(res,status,{error:errors.has(code)?code:"STOCK_EXECUTION_FAILED"});return true;
  }
 }
-module.exports={SQL,ensure,state,transact,rollbackSmoke,route,checkQuote,checkOrder,realizedCost};
+module.exports={SQL,ensure,state,transact,rollbackSmoke,rollbackLiveQuoteSmoke,route,checkQuote,checkOrder,realizedCost};
