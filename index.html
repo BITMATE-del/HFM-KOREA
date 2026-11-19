@@ -289,7 +289,7 @@ function syncTradingState(){
  Promise.all([apiCall('/api/trading/state'),apiCall('/api/futures/internal/state')]).then(([x,futuresInternal])=>{
   const previouslyLoaded=tradingState.loaded;
   const oldSnapshot=tradingState.snapshot;
-  const newSnapshot=JSON.stringify({orders:x.orders,positions:x.positions,fills:x.fills,wallet:x.wallet});
+  const newSnapshot=JSON.stringify({orders:x.orders,positions:x.positions,fills:x.fills,wallet:x.wallet,futuresOrders:futuresInternal.orders,futuresPositions:futuresInternal.positions});
   data.cash=Number(x.wallet?.futuresBalance||0);
   data.stockCash=Number(x.wallet?.stocksBalance||0);
   tradingState.stockEnabled=x.internalStockExecutionEnabled===true;
