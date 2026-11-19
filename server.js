@@ -276,7 +276,8 @@ http.createServer(async (req,res)=>{
    const period=url.searchParams.get("period")||"1min";
    const intervals=new Set(["1min","5min","15min","1hour","1session"]);
    if(!VALID_PRODUCTS.has(product)||!intervals.has(period))return jsonResponse(res,400,{error:"INVALID_FUTURES_PERIOD_OR_SYMBOL"});
-   const date=new Date().toISOString().slice(0,10);
+   // Align contract lookup with the successful Massive diagnostic date.
+   const date=new Date(Date.now()-8*60*60*1000).toISOString().slice(0,10);
    const contracts=await massiveFetch("/futures/v1/contracts",{product_code:product,date,active:"true",type:"single",limit:"100",sort:"ticker.asc"});
    if(!contracts.ok)return jsonResponse(res,503,{error:"CONTRACTS_UNAVAILABLE",reason:contracts.code});
    const chosen=chooseContract(contracts.results,product);
