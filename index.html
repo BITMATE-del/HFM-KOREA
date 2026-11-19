@@ -405,7 +405,9 @@ async function pullFuturesTop(id){
   futuresFeed.top[id]=r.ok&&j.available&&j.bid&&j.ask?j:{available:false,reason:(!r.ok?(j.reason||j.error||"UNAVAILABLE"):(j.reason||(j.stale?"STALE":"NO_DATA")))};
  }catch{futuresFeed.top[id]={available:false,reason:"NETWORK_ERROR"}}
  finally{futuresFeed.topPending.delete(id);
-  if(session.on&&session.page==="futures"&&session.sy// Display-only simulated depth: never used for execution, pricing or eligibility.
+  if(session.on&&session.page==="futures"&&session.symbol===id)renderTopOfBook(id)}
+}
+// Display-only simulated depth: never used for execution, pricing or eligibility.
 function sampleDisplayDepth(id){
  const earlier=futuresFeed.displayDepth[id];
  if(earlier&&Date.now()-earlier.updatedAt<4800)return earlier;
@@ -457,8 +459,6 @@ function renderTopOfBook(id){
  const note=$('#book-data-label');
  if(note)note.textContent=validTop?'매수·매도 1호가 가격: 실제 시세 / 모든 수량·건수: 모의 표시':'가격대: 최근 체결가 기준 참고 / 모든 수량·건수: 모의 표시';
 }
-(top.bid.size)+' (1호가)':'미제공';
-}
 function selectBookPrice(value){
  const number=Number(value),symbol=getSym(session.symbol);
  if(!Number.isFinite(number)||number<=0||session.symbol==='HSI')return;
@@ -466,7 +466,7 @@ function selectBookPrice(value){
  session.orderType='limit';
  const field=$('#price-field'),limit=$('#limit-price');
  if(field)field.classList.remove('hidden');
- $$('[data-order-type]').forEach(b=>b.classList.toggle('active',b.dataset.orderType==='limit'));
+ $('[data-order-type]').forEach(b=>b.classList.toggle('active',b.dataset.orderType==='limit'));
  if(limit){limit.value=session.limit;limit.disabled=false;limit.focus()}
  else render();
 }
