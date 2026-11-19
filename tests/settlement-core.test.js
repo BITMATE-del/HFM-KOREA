@@ -3,7 +3,7 @@ const {test}=require("node:test"),assert=require("node:assert/strict");
 const x=require("../settlement-core");
 test("NQ long 4 tick gain at 1400 KRW/USD, 2 contracts",()=>assert.equal(x.pnlKrw({symbol:"NQ",side:"BUY",entry:22000,exit:22001,qty:2,krwPerUsd:1400}),56000));
 test("MNQ short profit",()=>assert.equal(x.pnlKrw({symbol:"MNQ",side:"SELL",entry:22001,exit:22000,qty:1,krwPerUsd:1400}),2800));
-test("NQ short loss with fee",()=>assert.deepEqual(x.settlementPlan({symbol:"NQ",side:"SELL",entry:22000,exit:22001,qty:1,krwPerUsd:1400}),{grossPnlKrw:-28000,feeKrw:1500,netPnlKrw:-29500,releasedMarginKrw:3000000}));
+test("NQ short loss with fee",()=>assert.deepEqual(x.settlementPlan({symbol:"NQ",side:"SELL",entry:22000,exit:22001,qty:1,krwPerUsd:1400}),{grossPnlKrw:-28000,feeKrw:1500,netPnlKrw:-29500,releasedMarginKrw:300000}));
 test("ES ticks must match .25",()=>{assert.throws(()=>x.toTicks("ES",5500.13),/INVALID_TICK_PRICE/);assert.equal(x.toTicks("ES",5500.25)-x.toTicks("ES",5500),1)});
 test("CL tick size",()=>{assert.equal(x.toTicks("CL",80.01)-x.toTicks("CL",80),1);assert.throws(()=>x.toTicks("CL",80.015),/INVALID_TICK_PRICE/)});
 test("margin accounting excludes pending withdrawals",()=>assert.equal(x.availableMargin({balanceKrw:8000000,lockedKrw:3000000,pendingWithdrawalsKrw:2000000}),3000000));
@@ -31,3 +31,5 @@ test("CME nonmember exchange fees are separate from platform broker commission",
  assert.equal(x.nasdaqReference("MNQ",2).exchangeFeeRoundTripUsd,1.40);
  assert.equal(x.feesFor(1),1500);
 });
+
+test("NQ and MNQ configured internal margins",()=>{assert.equal(x.marginFor("NQ",1),300000);assert.equal(x.marginFor("NQ",3),900000);assert.equal(x.marginFor("MNQ",1),30000);assert.equal(x.marginFor("MNQ",5),150000)});
