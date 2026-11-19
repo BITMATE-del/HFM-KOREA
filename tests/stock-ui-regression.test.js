@@ -12,3 +12,11 @@ test("account state fetch failure is not triggered by an ordinary view render er
  assert.match(html,/try\{render\(\)\}catch\(viewError\)/);
  assert.match(html,/HFM_RENDER_ERROR/);
 });
+
+test("stock order request accepts validated KRX codes and stable browser idempotency UUIDs",()=>{
+ const engine=require("../stock-internal-engine");
+ const requestKey="550e8400-e29b-41d4-a716-446655440000";
+ assert.deepEqual(engine.checkOrder({symbol:"005930",side:"BUY",qty:1,requestKey}),{symbol:"005930",side:"BUY",qty:1,id:requestKey});
+ assert.equal(engine.checkOrder({symbol:5930,side:"SELL",qty:"1",requestKey}).symbol,"005930");
+ assert.throws(()=>engine.checkOrder({symbol:"005930",side:"BUY",qty:1}),/INVALID_STOCK_ORDER/);
+});
