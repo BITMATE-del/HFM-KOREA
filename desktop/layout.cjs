@@ -46,8 +46,10 @@ function selectPageScript(page){
  if(!pages.includes(page))throw Error("UNKNOWN_PAGE");
  return `(()=>{const b=document.querySelector('.nav-item[data-page="${page}"]');if(b)b.click();return !!b})()`;
 }
-function selectSymbolScript(symbol){
+function selectSymbolScript(symbol,label="",market=""){
  if(typeof symbol!=="string"||!(/^[A-Z]{1,8}$/.test(symbol)||/^\d{6}$/.test(symbol)))throw Error("INVALID_SYMBOL");
- return `(()=>{const b=document.querySelector('[data-watch="${symbol}"]');if(b){b.click();return true}return false})()`;
+ if(typeof label!=="string"||label.length>80||typeof market!=="string"||market.length>40)throw Error("INVALID_SYMBOL_METADATA");
+ const id=JSON.stringify(symbol),name=JSON.stringify(label),exchange=JSON.stringify(market);
+ return `(()=>{if(typeof window.HFMNavigateWatchSymbol==='function'){window.HFMNavigateWatchSymbol(${id},${name},${exchange});return true}const b=document.querySelector('[data-watch="'+${id}+'"]');if(b){b.click();return true}return false})()`;
 }
 module.exports={MODES,paneCSS,selectPageScript,selectSymbolScript};
