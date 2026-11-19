@@ -8,7 +8,6 @@
   status.textContent=text;
  }
  function barsFor(series,stock){
-  if(!stock)return [];
   const map=new Map();
   for(const x of series){
    const t=x.time;
