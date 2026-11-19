@@ -466,7 +466,7 @@ function selectBookPrice(value){
  session.orderType='limit';
  const field=$('#price-field'),limit=$('#limit-price');
  if(field)field.classList.remove('hidden');
- $('[data-order-type]').forEach(b=>b.classList.toggle('active',b.dataset.orderType==='limit'));
+ $$('[data-order-type]').forEach(b=>b.classList.toggle('active',b.dataset.orderType==='limit'));
  if(limit){limit.value=session.limit;limit.disabled=false;limit.focus()}
  else render();
 }
