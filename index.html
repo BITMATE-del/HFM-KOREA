@@ -445,8 +445,9 @@ function selectBookPrice(value){
  if(!Number.isFinite(number)||number<=0||session.symbol==='HSI')return;
  session.limit=String(roundTick(number,symbol.tick));
  session.orderType='limit';
- const limit=$('#limit-price');
- if($('#order-type'))$('#order-type').value='limit';
+ const field=$('#price-field'),limit=$('#limit-price');
+ if(field)field.classList.remove('hidden');
+ $('[data-order-type]').forEach(b=>b.classList.toggle('active',b.dataset.orderType==='limit'));
  if(limit){limit.value=session.limit;limit.disabled=false;limit.focus()}
  else render();
 }
