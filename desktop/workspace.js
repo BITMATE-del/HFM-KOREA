@@ -83,7 +83,7 @@ let updateReady=false;
 function showUpdatePanel(value){
  updatePanel.hidden=!value;updateButton.setAttribute("aria-expanded",String(!!value));
 }
-updateButton.addEventListener("click",()=>showUpdatePanel(updatePanel.hidden));
+updateButton.addEventListener("click",()=>window.hts.updateCheck());
 $("updateCheck").addEventListener("click",()=>window.hts.updateCheck());
 updateLater.addEventListener("click",()=>showUpdatePanel(false));
 updateInstall.addEventListener("click",()=>{if(updateReady)window.hts.updateInstall()});
@@ -99,13 +99,19 @@ window.hts.onUpdate?.(state=>{
   unsupported:"이 버전은 수동 업데이트 방식입니다.",installing:"프로그램을 종료하고 업데이트를 적용합니다."};
  const caption=captions[state.status]||"업데이트 상태를 확인할 수 없습니다.";
  updateMessage.textContent=caption+(state.status==="error"&&state.message?" ("+String(state.message).slice(0,90)+")":"")+"\n"+current+latest;
+ const messages={checking:"업데이트 확인 중",available:"업데이트 다운로드",
+  downloading:"다운로드 "+Math.round(Number(state.percent)||0)+"%",
+  downloaded:"업데이트 준비 완료",current:"최신 버전",error:"업데이트 재확인",
+  unsupported:"수동 업데이트",installing:"업데이트 적용 중"};
+ updateButton.textContent=messages[state.status]||"업데이트";
+ updateButton.title=caption;
  updateReady=state.status==="downloaded";
  updateProgress.hidden=state.status!=="downloading"&&state.status!=="downloaded";
  updateProgress.value=Math.max(0,Math.min(100,Number(state.percent)||0));
  updateInstall.hidden=!updateReady;
  updateLater.hidden=!updateReady;
  $("updateCheck").disabled=["checking","downloading","installing"].includes(state.status);
- if(updateReady)showUpdatePanel(true);
+ // The native Windows dialog is used on download completion to avoid overlap with trading views.
  if(state.status==="error")$("updateCheck").disabled=false;
 });
 $("refresh").addEventListener("click",()=>window.hts.refresh());
