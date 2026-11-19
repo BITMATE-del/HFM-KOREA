@@ -11,6 +11,23 @@ const SPECS=Object.freeze({
  MGC:Object.freeze({tickUnits:10,scale:100,mult:10,marginKrw:450000}),
  CL:Object.freeze({tickUnits:1,scale:100,mult:1000,marginKrw:2200000})
 });
+/* CME outright contract references (CME Equity Fee Schedule, effective 2026-10-19).
+ * These exchange-only non-member Globex fees are NOT brokerage commissions
+ * and must never silently replace the platform's configured KRW charging policy.
+ */
+const CME_NASDAQ_REFERENCE=Object.freeze({
+ effectiveDate:"2026-10-19",
+ source:"https://www.cmegroup.com/company/files/cme-fee-schedule-2026-10-19.pdf",
+ NQ:Object.freeze({tickSize:0.25,tickValueUsd:5,pointValueUsd:20,exchangeFeePerSideUsd:1.38}),
+ MNQ:Object.freeze({tickSize:0.25,tickValueUsd:0.5,pointValueUsd:2,exchangeFeePerSideUsd:0.35})
+});
+function nasdaqReference(symbol,qty=1){
+ const x=CME_NASDAQ_REFERENCE[symbol];
+ assert(x,"UNSUPPORTED_NASDAQ_REFERENCE");
+ checkedInt(qty,1,100,"INVALID_QTY");
+ return Object.freeze({...x,symbol,qty,exchangeFeePerSideTotalUsd:Math.round(x.exchangeFeePerSideUsd*qty*100)/100,
+ exchangeFeeRoundTripUsd:Math.round(x.exchangeFeePerSideUsd*qty*200)/100});
+}
 const CODE=/^[A-Z0-9]{2,10}$/;
 function assert(condition,code){if(!condition){const err=new Error(code);err.code=code;throw err}}
 function checkedInt(n,low,high,code){assert(typeof n==="number"&&Number.isSafeInteger(n)&&n>=low&&n<=high,code);return n}
@@ -54,4 +71,4 @@ function settlementPlan({symbol,side,entry,exit,qty,krwPerUsd,feeKrw=1500}){
  const fee=feesFor(qty,feeKrw);
  return Object.freeze({grossPnlKrw:gross,feeKrw:fee,netPnlKrw:gross-fee,releasedMarginKrw:marginFor(symbol,qty)});
 }
-module.exports={SPECS,specFor,toTicks,marginFor,feesFor,pnlKrw,availableMargin,checkQuote,settlementPlan};
+module.exports={SPECS,CME_NASDAQ_REFERENCE,nasdaqReference,specFor,toTicks,marginFor,feesFor,pnlKrw,availableMargin,checkQuote,settlementPlan};
