@@ -1,6 +1,6 @@
 {
   "name": "hfm-korea-hts-desktop",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "HFM KOREA native multi-pane Windows HTS sharing the existing authenticated trading backend",
   "main": "main.js",
@@ -27,7 +27,8 @@
       "workspace.html",
       "workspace.js",
       "offline.html",
-      "package.json"
+      "package.json",
+      "updater.cjs"
     ],
     "asar": true,
     "win": {
@@ -55,6 +56,17 @@
     },
     "portable": {
       "artifactName": "HFM-KOREA-HTS-Portable-${version}-${arch}.${ext}"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "BITMATE-del",
+        "repo": "HFM-KOREA",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.2"
   }
 }
