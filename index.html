@@ -98,7 +98,7 @@ async function pullFuturesMarket(id,tf="1분"){
   }
  }catch(err){
   futuresFeed.errors[id]=String(err?.message||"DATA_UNAVAILABLE").slice(0,70);
-  if(session.on&&session.page==="futures"&&session.symbol===id&&!futuresFeed.quotes[id])refreshPrices();
+  if(session.on&&session.page==="futures"&&session.symbol===id&&!futuresFeed.quotes[id]){refreshPrices();drawChart()}
  }finally{futuresFeed.pending.delete(key)}
 }
 async function jumpToFuturesHistory(){
