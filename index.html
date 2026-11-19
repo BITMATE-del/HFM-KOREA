@@ -4,6 +4,7 @@
 
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #8fb2ed;outline-offset:2px}.data-table td,.data-table th{font-variant-numeric:tabular-nums}
 
+.orderbook-panel .book-row[data-book-price]{cursor:pointer}.orderbook-panel .book-row.is-real{outline:1px solid rgba(65,110,190,.18);outline-offset:-1px}.orderbook-panel .book-row.is-reference{opacity:.72}.orderbook-panel .book-row[data-book-price]:hover{background:rgba(80,110,170,.11)}.orderbook-panel .book-row[data-book-price]:focus-visible{outline:2px solid #5489ed}.orderbook-panel .book-row.is-reference span:last-child{font-size:10px;color:var(--sub)}
 </style><link rel="stylesheet" href="/hfm-terminal.css?v=20261117d"><link rel="stylesheet" href="/hfm-market-chart.css?v=20261118c"><link rel="stylesheet" href="/hfm-stock-workspace.css?v=20261118e"><link rel="stylesheet" href="/hfm-watchlist.css?v=20261118e"><script src="/vendor/lightweight-charts.js?v=5.0.8" defer></script><script src="/hfm-market-chart.js?v=20261119-gc-zoom-fix" defer></script><link rel="stylesheet" href="/hfm-stocks.css?v=1"><style>
 /* HFM KOREA member application: grouped, compact, mobile-friendly */
 #signup-form{gap:13px}
@@ -408,20 +409,46 @@ async function pullFuturesTop(id){
 }
 function renderTopOfBook(id){
  const ask=$('#book-rows'),bid=$('#bid-rows');if(!ask||!bid)return;
- const s=getSym(id),top=futuresFeed.top[id];
- if(!top?.available){
-  const reason=top?.reason;
-  const text=reason==="AUTH_OR_ENTITLEMENT"?"호가 데이터 이용 권한을 확인해 주세요.":reason==="STALE"?"최근 호가 갱신이 확인되지 않습니다.":reason?"현재 최우선 호가 데이터를 불러올 수 없습니다.":"최우선 호가를 조회하고 있습니다.";
-  ask.replaceChildren();const notice=document.createElement('div');notice.className='stock-orderbook-empty';notice.textContent=text;ask.appendChild(notice);bid.replaceChildren();
-  
-  
+ const symbol=getSym(id),top=futuresFeed.top[id],tick=Number(symbol.tick)||0.25;
+ const current=futuresFeed.quotes[id]?.price||0;
+ const validTop=!!(top?.available&&top.ask?.price>0&&top.bid?.price>0);
+ const askStart=validTop?top.ask.price:(current?Math.ceil((current+tick)/tick)*tick:0);
+ const bidStart=validTop?top.bid.price:(current?Math.floor((current-tick)/tick)*tick:0);
+ if(!(askStart>0&&bidStart>0)){
+  ask.innerHTML='<div class="stock-orderbook-empty">호가 가격대를 조회하고 있습니다.</div>';
+  bid.replaceChildren();
+  if($('#ask-total'))$('#ask-total').textContent='—';
+  if($('#bid-total'))$('#bid-total').textContent='—';
   return;
  }
- const line=(side,v)=>'<div class="book-row '+side+'"><span class="mono">'+fmt(v.size)+'</span><strong class="mono '+side+'-price">'+shownPrice(v.price,s)+'</strong><span>1호가</span></div>';
- ask.innerHTML=line('ask',top.ask);
- bid.innerHTML=line('bid',top.bid);
- if($('#ask-total'))$('#ask-total').textContent=fmt(top.ask.size)+' (1호가)';
- if($('#bid-total'))$('#bid-total').textContent=fmt(top.bid.size)+' (1호가)';
+ const row=(side,index)=>{
+  const base=side==='ask'?askStart:bidStart;
+  const level=side==='ask'?9-index:index;
+  const referencePrice=roundTick(base+(side==='ask'?level:-level)*tick,tick);
+  const isReal=validTop&&level===0;
+  const size=isReal?(side==='ask'?top.ask.size:top.bid.size):null;
+  const maxSize=validTop?Math.max(top.ask.size,top.bid.size,1):1;
+  const width=size===null?0:Math.max(3,Math.round(size/maxSize*80));
+  return '<div class="book-row '+side+' '+(isReal?'is-real':'is-reference')+'" data-book-price="'+referencePrice+'" title="'+(isReal?'실제 최우선 호가':'가격 간격 기준 참고 레벨 — 잔량 미제공')+' · 클릭하여 지정가 입력" role="button" tabindex="0">'+
+   (size===null?'':('<span class="level-bar" style="width:'+width+'%"></span>'))+
+   '<span class="mono">'+(size===null?'—':fmt(size))+'</span>'+
+   '<strong class="mono '+side+'-price">'+shownPrice(referencePrice,symbol)+'</strong>'+
+   '<span>'+(isReal?'실제 1호가':'참고')+'</span></div>';
+ };
+ ask.innerHTML=Array.from({length:10},(_,i)=>row('ask',i)).join('');
+ bid.innerHTML=Array.from({length:10},(_,i)=>row('bid',i)).join('');
+ if($('#ask-total'))$('#ask-total').textContent=validTop?fmt(top.ask.size)+' (1호가)':'미제공';
+ if($('#bid-total'))$('#bid-total').textContent=validTop?fmt(top.bid.size)+' (1호가)':'미제공';
+}
+function selectBookPrice(value){
+ const number=Number(value),symbol=getSym(session.symbol);
+ if(!Number.isFinite(number)||number<=0||session.symbol==='HSI')return;
+ session.limit=String(roundTick(number,symbol.tick));
+ session.orderType='limit';
+ const limit=$('#limit-price');
+ if($('#order-type'))$('#order-type').value='limit';
+ if(limit){limit.value=session.limit;limit.disabled=false;limit.focus()}
+ else render();
 }
 function bookHTML(){return '<div class="stock-orderbook-empty">호가 정보는 아직 제공되지 않습니다.</div>'}
 function candleData(s){const current=price(s.id),arr=[];for(let i=0;i<65;i++){const v=(i-64);const delta=(Math.sin(i*.16+s.price*.001)*22+Math.cos(i*.42+s.price*.003)*8+v*.07)*s.tick*3;const open=current+delta;const close=open+Math.sin(i*.86+s.price*.0002)*s.tick*12;const high=Math.max(open,close)+Math.abs(Math.sin(i*1.8))*s.tick*7;const low=Math.min(open,close)-Math.abs(Math.cos(i*1.3))*s.tick*8;arr.push({open,close,high,low,vol:15+Math.floor(Math.abs(Math.sin(i*.71))*45)})}return arr}
@@ -547,7 +574,13 @@ function accountPage(){
  return head('계정관리','회원 정보 및 보안 설정')+'<div class="section-row"><section class="panel"><div class="panel-head"><h3 class="panel-title">계정정보</h3></div><div class="panel-body"><div class="settings-row"><label>사용자</label><strong>'+X(u?.username||'체험 사용자')+'</strong></div><div class="settings-row"><label>이름</label><strong>'+X(u?.name||'—')+'</strong></div><div class="settings-row"><label>전화번호</label><strong>'+X(u?.phone||'—')+'</strong></div><div class="settings-row"><label>계정 상태</label><span class="pill">'+(u?.status==='ACTIVE'?'정상':u?'제한':'로컬 체험')+'</span></div><div class="settings-row"><label>담당 코드</label><span>'+X(u?.referral||'—')+'</span></div>'+(u?.role==='ADMIN'?'<div class="settings-row"><label>운영 관리자</label><a href="/admin.html">관리자 페이지 열기</a></div>':'')+'</div></section><section class="panel"><div class="panel-head"><h3 class="panel-title">보안 및 환경 설정</h3></div><div class="panel-body">'+(u?'<form id="account-password-form" class="form-stack" style="max-width:430px"><label>현재 비밀번호<input class="field" type="password" name="current" required></label><label>새 비밀번호 (10자 이상)<input class="field" type="password" name="next" minlength="10" required></label><label>새 비밀번호 확인<input class="field" type="password" name="verify" minlength="10" required></label><button type="submit" class="btn btn-primary">비밀번호 변경</button></form>':'<p class="muted">비밀번호 변경은 회원 로그인 후 가능합니다.</p>')+'<div class="settings-row" style="margin-top:15px"><label>화면 테마</label><button class="btn" id="account-theme">'+(session.dark?'라이트 모드':'다크 모드')+'</button></div><p class="muted" style="font-size:11px">거래 화면에 표시되는 가상 잔고와 주문 내역은 실제 회원 자산이 아닙니다.</p></div></section></div>';
 }
 function render(){if(!session.on)return;const page=session.page;if(page==='stocks'&&getSym(session.symbol).kind!=='stocks')session.symbol='005930';if(page==='futures'&&getSym(session.symbol).kind!=='futures')session.symbol='NQ';$$('.nav-item').forEach(b=>b.classList.toggle('selected',b.dataset.page===page));$('#main-content').innerHTML=({futures:()=>tradePage('futures'),stocks:()=>tradePage('stocks'),quotes:quotesPage,wallet:walletPage,orders:ordersPage,pnl:pnlPage,calendar:calendarPage,support:supportPage,notices:noticesPage,account:accountPage}[page]||quotesPage)();refreshPrices();if(['futures','stocks'].includes(page))requestAnimationFrame(drawChart);if(page==='stocks')loadStockView();if(page==='futures'){loadFuturesView();renderTopOfBook(session.symbol);pullFuturesTop(session.symbol)}if(page==='support'){$('#chat-area').scrollTop=$('#chat-area').scrollHeight}bindPage()}
-function bindPage(){if($('[data-futures-history]'))$('[data-futures-history]').onclick=loadOlderFuturesBars;if($('[data-futures-history-jump]'))$('[data-futures-history-jump]').onclick=jumpToFuturesHistory;if($('[data-futures-history-live]'))$('[data-futures-history-live]').onclick=()=>{const k=session.symbol+'|'+(futuresPeriods[session.tf]||'1min');delete futuresFeed.historyView[k];drawChart()};if($('[data-retry-trading]'))$('[data-retry-trading]').onclick=()=>{tradingState.lastAt=0;syncTradingState()};
+function bindPage(){
+ const bookPanel=$('#book-rows')?.closest('.orderbook-panel');
+ if(bookPanel){
+  bookPanel.onclick=e=>{const row=e.target.closest('[data-book-price]');if(row)selectBookPrice(row.dataset.bookPrice)};
+  bookPanel.onkeydown=e=>{if((e.key==='Enter'||e.key===' ')&&e.target.closest('[data-book-price]')){e.preventDefault();selectBookPrice(e.target.closest('[data-book-price]').dataset.bookPrice)}};
+ }
+if($('[data-futures-history]'))$('[data-futures-history]').onclick=loadOlderFuturesBars;if($('[data-futures-history-jump]'))$('[data-futures-history-jump]').onclick=jumpToFuturesHistory;if($('[data-futures-history-live]'))$('[data-futures-history-live]').onclick=()=>{const k=session.symbol+'|'+(futuresPeriods[session.tf]||'1min');delete futuresFeed.historyView[k];drawChart()};if($('[data-retry-trading]'))$('[data-retry-trading]').onclick=()=>{tradingState.lastAt=0;syncTradingState()};
  const search=$('#stock-search-input');
  if(search){
   search.oninput=()=>{stockUI.query=search.value;clearTimeout(stockUI.timer);stockUI.timer=setTimeout(()=>searchStocks(search.value),280)};
