@@ -37,7 +37,7 @@ async function massiveFetch(path,params){
  if(!key)return {code:"MISSING_KEY",ok:false};
  const now=Date.now(),id=path+"?"+new URLSearchParams(params).toString();
  const cached=massiveState.cache.get(id);
- if(cached && now-cached.at<(path.startsWith("/futures/v1/aggs/")?15000:180000))return cached.value;
+ if(cached && now-cached.at<(path.startsWith("/futures/v1/quotes/")?4000:path.startsWith("/futures/v1/aggs/")?15000:180000))return cached.value;
  if(massiveState.pending.has(id))return massiveState.pending.get(id);
  if(now<massiveState.nextAt)return {code:"COOLDOWN",ok:false,retryAfter:Math.ceil((massiveState.nextAt-now)/1000)};
  // Globally serialized across all check routes, leaving room under 5/minute.
@@ -267,6 +267,34 @@ http.createServer(async (req,res)=>{
     console.warn("STOCK_FEED_ERROR",{kind:url.pathname.endsWith("/quote")?"quote":"chart",symbol,reason:String(e.message||"UNAVAILABLE").slice(0,55)});
     return jsonResponse(res,503,{error:"STOCK_DATA_UNAVAILABLE",symbol});
    }
+  }
+  if(url.pathname==="/api/futures/top-of-book"){
+   if(req.method!=="GET")return jsonResponse(res,405,{error:"METHOD_NOT_ALLOWED"});
+   const member=await appApi.auth(req);
+   if(!member)return jsonResponse(res,401,{error:"LOGIN_REQUIRED"});
+   const product=(url.searchParams.get("product")||"NQ").toUpperCase();
+   if(!VALID_PRODUCTS.has(product))return jsonResponse(res,400,{error:"INVALID_FUTURES_SYMBOL"});
+   const contractDate=new Date(Date.now()-8*60*60*1000).toISOString().slice(0,10);
+   const contracts=await massiveFetch("/futures/v1/contracts",{product_code:product,date:contractDate,active:"true",type:"single",limit:"100",sort:"ticker.asc"});
+   if(!contracts.ok)return jsonResponse(res,503,{error:"CONTRACTS_UNAVAILABLE",reason:contracts.code});
+   const chosen=chooseContract(contracts.results,product);
+   if(!chosen)return jsonResponse(res,404,{error:"NO_ACTIVE_CONTRACT"});
+   const quotes=await massiveFetch("/futures/v1/quotes/"+encodeURIComponent(chosen.ticker),{sort:"timestamp.desc",limit:"10"});
+   if(!quotes.ok)return jsonResponse(res,503,{error:"TOP_OF_BOOK_UNAVAILABLE",reason:quotes.code});
+   const item=quotes.results.find(q=>Number(q?.bid_price)>0&&Number(q?.ask_price)>0
+     &&Number.isSafeInteger(Number(q?.bid_size))&&Number.isSafeInteger(Number(q?.ask_size))
+     &&Number(q.bid_size)>=0&&Number(q.ask_size)>=0&&Number(q.bid_price)<=Number(q.ask_price));
+   if(!item)return jsonResponse(res,200,{product,contract:chosen.ticker,level:1,available:false,reason:"NO_VALID_TOP_OF_BOOK"});
+   let asOf=null,ageSeconds=null;
+   try{
+    const ms=Number(BigInt(String(item.timestamp))/1000000n);
+    if(Number.isSafeInteger(ms)&&ms>0&&ms<=Date.now()+60000){asOf=new Date(ms).toISOString();ageSeconds=Math.max(0,Math.floor((Date.now()-ms)/1000))}
+   }catch{}
+   const fresh=ageSeconds!==null&&ageSeconds<60;
+   return jsonResponse(res,200,{product,contract:chosen.ticker,level:1,available:fresh,
+    stale:!fresh,asOf,ageSeconds,
+    ...(fresh?{bid:{price:Number(item.bid_price),size:Number(item.bid_size)},
+               ask:{price:Number(item.ask_price),size:Number(item.ask_size)}}:{})});
   }
   if(url.pathname==="/api/futures/market"){
    if(req.method!=="GET")return jsonResponse(res,405,{error:"METHOD_NOT_ALLOWED"});
