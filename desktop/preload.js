@@ -3,7 +3,8 @@ const {contextBridge,ipcRenderer}=require("electron");
 contextBridge.exposeInMainWorld("hts",Object.freeze({
  layout:(rects)=>ipcRenderer.send("hts:layout",rects),
  page:(page)=>ipcRenderer.send("hts:page",page),
- symbol:(symbol)=>ipcRenderer.send("hts:symbol",symbol),
+ symbol:(symbol,label,market)=>ipcRenderer.send("hts:symbol",symbol,label,market),
+ searchStocks:(query)=>ipcRenderer.invoke("hts:search-stocks",query),
  refresh:()=>ipcRenderer.send("hts:refresh"),
  reconnect:()=>ipcRenderer.send("hts:reconnect"),
  popout:(kind)=>ipcRenderer.send("hts:popout",kind),
