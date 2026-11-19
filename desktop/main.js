@@ -3,7 +3,7 @@ const path=require("node:path");
 const {app,BrowserWindow,Menu,shell,dialog,session,screen}=require("electron");
 const {HOME_URL,isTrustedAppUrl,isExternalAllowed,browserNavScript}=require("./config.cjs");
 
-const APP_ID="kr.co.veltro.hts";
+const APP_ID="kr.co.hfmkorea.hts";
 app.setAppUserModelId(APP_ID);
 if(!app.requestSingleInstanceLock())app.quit();
 
@@ -20,7 +20,7 @@ async function showOffline(){
 }
 function updateTitle(){
  if(!windowRef||windowRef.isDestroyed())return;
- windowRef.setTitle(offline?"VELTRO HTS · 연결 확인":"VELTRO HTS");
+ windowRef.setTitle(offline?"HFM KOREA HTS · 연결 확인":"HFM KOREA HTS");
 }
 async function connect(){
  if(!windowRef||windowRef.isDestroyed()||reconnecting)return;
@@ -58,8 +58,8 @@ function createMenu(){
   ]},
   {label:"프로그램",submenu:[
    {label:"서버 연결 상태",click:()=>dialog.showMessageBox(windowRef,{
-    type:"info",title:"VELTRO HTS",message:offline?"서버 연결이 필요합니다.":"프로그램이 거래 서버에 연결되어 있습니다.",
-    detail:"회원 로그인, 시세 및 주문은 기존 VELTRO 서버에서 처리됩니다.",buttons:["확인"]
+    type:"info",title:"HFM KOREA HTS",message:offline?"서버 연결이 필요합니다.":"프로그램이 거래 서버에 연결되어 있습니다.",
+    detail:"회원 로그인, 시세 및 주문은 기존 HFM KOREA 서버에서 처리됩니다.",buttons:["확인"]
    })},
    {type:"separator"},
    {label:"프로그램 종료",role:"quit"}
@@ -70,7 +70,7 @@ function createMenu(){
 function createWindow(){
  const display=screen.getPrimaryDisplay().workAreaSize;
  windowRef=new BrowserWindow({
-  title:"VELTRO HTS",
+  title:"HFM KOREA HTS",
   width:Math.min(1560,display.width),height:Math.min(960,display.height),
   minWidth:900,minHeight:620,
   backgroundColor:"#edf2f8",show:false,autoHideMenuBar:false,
