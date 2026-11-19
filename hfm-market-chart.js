@@ -33,7 +33,7 @@
   old.chart?.remove();
   instances.delete(el);
  }
- function mount(el,{symbol,tf,dark=false,stock=false,series=[],source=""}={}){
+ function mount(el,{symbol,tf,dark=false,stock=false,series=[],source="",feedError=""}={}){
   if(!el)return;
   const library=global.LightweightCharts;
   if(!library?.createChart||!library.CandlestickSeries){
@@ -47,7 +47,7 @@
   if(old)dispose(el);
   el.replaceChildren();
   if(data.length===0){
-   legend(el,stock?"해당 시간대의 확인된 시세 데이터가 없습니다.":"해외선물 실시간·과거 봉 데이터 연결이 필요합니다.");
+   legend(el,stock?"해당 시간대의 확인된 시세 데이터가 없습니다.":feedError?"시세를 불러오지 못했습니다. 잠시 후 다시 연결합니다.":"실시간 시세를 연결 중입니다…");
    el.dataset.chartStatus="unavailable";
    return;
   }
