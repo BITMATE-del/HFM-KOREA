@@ -277,12 +277,18 @@ http.createServer(async (req,res)=>{
    const intervals=new Set(["1min","5min","15min","1hour","1session"]);
    if(!VALID_PRODUCTS.has(product)||!intervals.has(period))return jsonResponse(res,400,{error:"INVALID_FUTURES_PERIOD_OR_SYMBOL"});
    // Align contract lookup with the successful Massive diagnostic date.
-   const date=new Date(Date.now()-8*60*60*1000).toISOString().slice(0,10);
+   const beforeRaw=url.searchParams.get("before");
+   const before=beforeRaw===null?null:Number(beforeRaw);
+   if(beforeRaw!==null&&(!Number.isSafeInteger(before)||before<1491177600||before>Math.floor(Date.now()/1000)))
+    return jsonResponse(res,400,{error:"INVALID_HISTORY_CURSOR"});
+   const date=new Date(before===null?Date.now()-8*60*60*1000:before*1000).toISOString().slice(0,10);
    const contracts=await massiveFetch("/futures/v1/contracts",{product_code:product,date,active:"true",type:"single",limit:"100",sort:"ticker.asc"});
    if(!contracts.ok)return jsonResponse(res,503,{error:"CONTRACTS_UNAVAILABLE",reason:contracts.code});
    const chosen=chooseContract(contracts.results,product);
    if(!chosen)return jsonResponse(res,404,{error:"NO_ACTIVE_CONTRACT"});
-   const bars=await massiveFetch("/futures/v1/aggs/"+encodeURIComponent(chosen.ticker),{resolution:period,sort:"window_start.desc",limit:period==="1session"?"250":"450"});
+   const aggregateParams={resolution:period,sort:"window_start.desc",limit:period==="1session"?"3000":"5000"};
+   if(before!==null)aggregateParams["window_start.lt"]=String(BigInt(before)*1000000000n);
+   const bars=await massiveFetch("/futures/v1/aggs/"+encodeURIComponent(chosen.ticker),aggregateParams);
    if(!bars.ok)return jsonResponse(res,503,{error:"FUTURES_BARS_UNAVAILABLE",reason:bars.code});
    const items=bars.results.map(x=>{
     let time;try{time=Number(BigInt(String(x.window_start))/1000000000n)}catch{return null}
