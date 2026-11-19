@@ -40,15 +40,18 @@
             "x64"
           ]
         }
-      ],
-      "artifactName": "VELTRO-HTS-${version}-${arch}.${ext}"
+      ]
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "artifactName": "VELTRO-HTS-Setup-${version}-${arch}.${ext}"
     },
-    "publish": null
+    "publish": null,
+    "portable": {
+      "artifactName": "VELTRO-HTS-Portable-${version}-${arch}.${ext}"
+    }
   }
 }
