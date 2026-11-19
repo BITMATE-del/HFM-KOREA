@@ -30,26 +30,36 @@ nav h3{font-size:11px;color:#73829b;letter-spacing:1px;margin:3px 4px 11px}
 #mainAuthNote{position:absolute;top:16px;left:24px;font-size:11px;color:#7184a3;z-index:1;pointer-events:none}
 body.compact #panes{grid-template-columns:minmax(0,1fr) 300px;grid-template-rows:minmax(290px,1fr) minmax(150px,25%)}
 @media(max-width:1080px){#dashboard{grid-template-columns:155px minmax(0,1fr)}#panes{grid-template-columns:minmax(0,1fr) 275px;grid-template-rows:minmax(290px,1fr) minmax(140px,27%)}.brand{min-width:155px}}
-</style></head>
+</style><link rel="stylesheet" href="./hts-theme.css"></head>
 <body>
 <header id="top">
  <div class="brand"><span class="logo">H</span><div><b>HFM KOREA</b><small>HTS TERMINAL</small></div></div>
  <div class="mode-buttons"><button data-mode="futures" class="active">해외선물</button><button data-mode="stocks">국내주식</button></div>
- <div class="top-end"><span class="status" id="connectState"><span class="dot"></span><span id="connectLabel">서버 연결 중</span></span><button id="refresh">새로고침</button><button id="preset">화면 정리</button></div>
+ <div class="top-end"><span id="versionLabel">v0.3.0</span><span class="status" id="connectState"><span class="dot"></span><span id="connectLabel">서버 연결 중</span></span><button id="updateButton" aria-expanded="false" type="button">업데이트</button><button id="refresh">새로고침</button><button id="preset">화면 정리</button></div>
 </header>
 <section id="surface">
  <div id="loginSurface"><div id="mainAuthNote">HFM KOREA 회원 계정으로 로그인하세요.</div></div>
  <div id="dashboard" hidden>
   <nav><h3>종목 빠른 선택</h3><input id="symbolSearch" type="search" placeholder="종목명 / 코드 검색" autocomplete="off">
    <div id="symbols"></div>
-   <div class="nav-footer">실제 시세 및 주문은 HFM 서버의 기존 기능을 사용합니다. 작업 영역만 HTS 전용으로 분리했습니다.</div>
+   <div class="nav-footer">HFM KOREA HTS<br>해외선물 · 국내주식</div>
   </nav>
   <main id="panes">
    <section class="pane" id="chartPane"><div class="pane-head"><b>차트 · 시세</b><small id="chartTitle">나스닥 100</small><button data-popout="chart">별도 창</button></div><div class="slot" id="chartSlot"></div></section>
-   <section class="pane" id="orderPane"><div class="pane-head"><b>주문</b><small>기존 주문 엔진 연결</small><button data-popout="order">별도 창</button></div><div class="slot" id="orderSlot"></div></section>
+   <section class="pane" id="orderPane"><div class="pane-head"><b>주문</b><small>시장가 · 지정가</small><button data-popout="order">별도 창</button></div><div class="slot" id="orderSlot"></div></section>
    <section class="pane" id="positionsPane"><div class="pane-head"><b>보유 포지션 · 미체결 · 체결 내역</b><button data-popout="positions">별도 창</button></div><div class="slot" id="positionsSlot"></div></section>
   </main>
  </div>
+ <aside id="updatePanel" class="update-panel" hidden aria-live="polite">
+  <strong>프로그램 업데이트</strong>
+  <p id="updateMessage">최신 버전 확인을 시작할 수 있습니다.</p>
+  <progress id="updateProgress" max="100" value="0" hidden></progress>
+  <div class="update-actions">
+   <button id="updateCheck" type="button">업데이트 확인</button>
+   <button id="updateLater" type="button" hidden>나중에</button>
+   <button id="updateInstall" class="primary" type="button" hidden>지금 재시작</button>
+  </div>
+ </aside>
  <span id="statusText"></span>
 </section>
 <script src="./workspace.js"></script></body></html>
