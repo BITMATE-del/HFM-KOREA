@@ -363,7 +363,7 @@ function drawChart(){
  window.HFMMarketChart.mount(target,{symbol,tf,dark:session.dark,stock,series:data?.candles||[],source:data?.source||''});
 }
 function refreshPrices(){if(!$('#platform')||$('#platform').classList.contains('hidden'))return;const s=getSym(session.symbol);const q=s.kind==='stocks'?stockFeed.quotes[s.id]:futuresFeed.quotes[s.id];
- if(!q){for(const el of $('#trade-current,#book-current'))el.textContent='—';if($('#trade-change'))$('#trade-change').textContent='—';return}
+ if(!q){for(const el of $$('#trade-current,#book-current'))el.textContent='—';if($('#trade-change'))$('#trade-change').textContent='—';return}
  const p=price(s.id),ref=q.previousClose||p,diff=p-ref;for(const el of $$('#trade-current,#book-current'))el.textContent=shownPrice(p,s);if($('#trade-change'))$('#trade-change').textContent=(diff>=0?'+':'')+shownPrice(diff,s)+' ('+(diff/ref*100).toFixed(2)+'%)';if($('#book-rows'))$('#book-rows').innerHTML='<div class="stock-orderbook-empty">호가 수량 데이터는 제공되지 않습니다.</div>';
  if($('#bid-rows'))$('#bid-rows').innerHTML='';
  if($('#ask-total'))$('#ask-total').textContent='—';
