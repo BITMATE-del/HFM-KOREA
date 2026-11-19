@@ -40,12 +40,14 @@ async function navigatePane(name,page){
  try{await pane.webContents.executeJavaScript(selectPageScript(page),true)}
  catch(e){console.warn("HTS navigation:",name,e.message)}
 }
-async function chooseSymbol(symbol){
+async function chooseSymbol(symbol,label="",market=""){
  activeSymbol=symbol;
- const work=[...panes.entries()].filter(([name])=>name==="chart"||name==="order");
+ const work=[...panes.entries()].filter(([name])=>name==="chart"||name==="order"||name==="positions");
  for(const [,view] of work){
-  try{await view.webContents.executeJavaScript(selectSymbolScript(symbol),true)}catch{}
+  if(view.webContents.isDestroyed()||!isTrustedAppUrl(view.webContents.getURL()))continue;
+  try{await view.webContents.executeJavaScript(selectSymbolScript(symbol,label,market),true)}catch{}
  }
+ send("hts:symbol-changed",{symbol,label});
 }
 async function onPaneLoaded(name,contents){
  if(!isTrustedAppUrl(contents.getURL()))return;
@@ -97,6 +99,20 @@ async function pollAuthentication(){
     for(const name of ["order","positions"])navigatePane(name,activePage);
    }
    applyBounds();
+  }
+  if(loggedIn&&activePage==="stocks"){
+   const current=await chart.webContents.executeJavaScript(
+    "typeof window.HFMCurrentWatchSymbol==='function'?window.HFMCurrentWatchSymbol():''",true).catch(()=>"");
+   if(/^\\d{6}$/.test(current)&&current!==activeSymbol){
+    activeSymbol=current;
+    send("hts:symbol-changed",{symbol:current});
+    for(const name of ["order","positions"]){
+     const view=panes.get(name);
+     if(view&&!view.webContents.isDestroyed()){
+      view.webContents.executeJavaScript(selectSymbolScript(current),true).catch(()=>{});
+     }
+    }
+   }
   }
  }catch{}
 }
