@@ -7,11 +7,11 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test tests/*.test.cjs",
-    "dist:win": "electron-builder --win nsis portable --x64 --publish never"
+    "dist:win": "electron-builder --win --x64 --publish never"
   },
   "devDependencies": {
     "electron": "45.3.4",
-    "electron-builder": "26.0.20"
+    "electron-builder": "26.18.0"
   },
   "build": {
     "appId": "kr.co.veltro.hts",
@@ -49,7 +49,6 @@
       "createStartMenuShortcut": true,
       "artifactName": "VELTRO-HTS-Setup-${version}-${arch}.${ext}"
     },
-    "publish": null,
     "portable": {
       "artifactName": "VELTRO-HTS-Portable-${version}-${arch}.${ext}"
     }
