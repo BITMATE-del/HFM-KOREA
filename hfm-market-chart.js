@@ -41,9 +41,22 @@
    return;
   }
   const data=barsFor(series,stock);
-  const key=[symbol,tf,dark?"dark":"light",source,data.length,data.at(-1)?.time,data.at(-1)?.close].join("|");
+  const key=[symbol,tf,dark?"dark":"light",source].join("|");
+  const signature=[data.length,data[0]?.time,data.at(-1)?.time,data.at(-1)?.close].join("|");
   const old=instances.get(el);
-  if(old?.key===key)return;
+  if(old?.key===key && old?.signature===signature)return;
+  if(old?.key===key && data.length){
+   const scale=old.chart.timeScale(),range=scale.getVisibleLogicalRange();
+   const atRight=!range||range.to>=old.count-12;
+   const candlesData=data.map(x=>({time:x.time,open:x.open,high:x.high,low:x.low,close:x.close}));
+   old.candles.setData(candlesData);
+   old.volume.setData(data.map(x=>({time:x.time,value:x.vol,color:x.close>=x.open?"#ed768a":"#6d91e6"})));
+   for(const [i,period] of [5,20,60].entries())old.lines[i].setData(average(data,period));
+   old.signature=signature;old.count=data.length;
+   if(atRight)scale.scrollToRealTime();
+   else if(range)scale.setVisibleLogicalRange(range);
+   return;
+  }
   if(old)dispose(el);
   el.replaceChildren();
   if(data.length===0){
@@ -73,17 +86,21 @@
    const vol=chart.addSeries(library.HistogramSeries,{priceFormat:{type:"volume"},priceScaleId:"volume",lastValueVisible:false,priceLineVisible:false});
    chart.priceScale("volume").applyOptions({scaleMargins:{top:.80,bottom:0}});
    vol.setData(data.map(x=>({time:x.time,value:x.vol,color:x.close>=x.open?"#ed768a":"#6d91e6"})));
+   const lines=[];
    for(const [period,color]of [[5,"#e1a54e"],[20,"#c85986"],[60,"#6379cc"]]){
     const line=chart.addSeries(library.LineSeries,{color,lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
-    line.setData(average(data,period));
+    line.setData(average(data,period));lines.push(line);
    }
-   chart.timeScale().setVisibleLogicalRange({from:Math.max(0,data.length-60),to:data.length+5});
+   // Open on readable recent candles rather than fitting thousands of history bars.
+   const focusLatest=()=>chart.timeScale().setVisibleLogicalRange({from:Math.max(0,data.length-80),to:data.length+5});
+   focusLatest();
+   requestAnimationFrame(()=>{if(target.isConnected)focusLatest()});
    const observer=new ResizeObserver(()=>{
     if(!target.isConnected)return;
     chart.applyOptions({width:Math.max(260,target.clientWidth),height:Math.max(290,target.clientHeight)});
    });
    observer.observe(target);
-   instances.set(el,{chart,observer,key});
+   instances.set(el,{chart,observer,key,signature,count:data.length,candles,volume:vol,lines});
   }catch(err){
    chart?.remove();
    console.warn("HFM_CHART_RENDER_FAILED",String(err?.message||"unavailable").slice(0,70));
