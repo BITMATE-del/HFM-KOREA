@@ -399,6 +399,16 @@ function candleData(s){const current=price(s.id),arr=[];for(let i=0;i<65;i++){co
 function drawChart(){
  const target=$('#hfm-market-chart');if(!target||!window.HFMMarketChart)return;
  const symbol=session.symbol,tf=session.tf||'1분',stock=getSym(symbol).kind==='stocks';
+ if(symbol==='HSI'){
+  target.replaceChildren();
+  target.dataset.chartStatus='maintenance';
+  const notice=document.createElement('div');
+  notice.className='hfm-market-chart-status';
+  notice.textContent='현재 점검중인 종목입니다';
+  notice.style.cssText='min-height:320px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:14px;color:var(--sub,#687b97);';
+  target.appendChild(notice);
+  return;
+ }
  const period=stock?stockTfPeriod[tf]||'minute1':futuresPeriods[tf]||'1min';
  const data=stock?stockFeed.bars[symbol+'|'+period]:(futuresFeed.historyView[symbol+'|'+period]||futuresFeed.bars[symbol+'|'+period]);
  window.HFMMarketChart.mount(target,{symbol,tf,dark:session.dark,stock,series:data?.candles||[],source:data?.source||'',feedError:stock?'':(futuresFeed.errors[symbol]||''),focusOldest:!!futuresFeed.historyView[symbol+'|'+period]});
