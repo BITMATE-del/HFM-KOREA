@@ -103,7 +103,7 @@ async function pollAuthentication(){
   if(loggedIn&&activePage==="stocks"){
    const current=await chart.webContents.executeJavaScript(
     "typeof window.HFMCurrentWatchSymbol==='function'?window.HFMCurrentWatchSymbol():''",true).catch(()=>"");
-   if(/^\\d{6}$/.test(current)&&current!==activeSymbol){
+   if(/^\d{6}$/.test(current)&&current!==activeSymbol){
     activeSymbol=current;
     send("hts:symbol-changed",{symbol:current});
     for(const name of ["order","positions"]){
@@ -210,7 +210,24 @@ ipcMain.on("hts:layout",(event,rects)=>{
  applyBounds();
 });
 ipcMain.on("hts:page",(e,page)=>{if(fromWorkspace(e))setPage(page)});
-ipcMain.on("hts:symbol",(e,symbol)=>{if(fromWorkspace(e)&&/^(?:[A-Z]{1,8}|\d{6})$/.test(symbol))chooseSymbol(symbol)});
+ipcMain.on("hts:symbol",(e,symbol,label="",market="")=>{
+ if(fromWorkspace(e)&&typeof symbol==="string"&&/^(?:[A-Z]{1,8}|\d{6})$/.test(symbol)&&
+ typeof label==="string"&&label.length<=80&&typeof market==="string"&&market.length<=40)chooseSymbol(symbol,label,market);
+});
+ipcMain.handle("hts:search-stocks",async(e,query)=>{
+ if(!fromWorkspace(e)||!authenticated||typeof query!=="string")return [];
+ const q=query.trim().slice(0,50);
+ if(!q)return [];
+ const view=panes.get("chart");
+ if(!view||view.webContents.isDestroyed()||!isTrustedAppUrl(view.webContents.getURL()))return [];
+ try{
+  const script="(async()=>{const r=await fetch('/api/stocks/catalog?q='+encodeURIComponent("+JSON.stringify(q)+"),{credentials:'same-origin',cache:'no-store'});if(!r.ok)return [];const d=await r.json();return Array.isArray(d.items)?d.items.slice(0,35):[]})()";
+  const results=await view.webContents.executeJavaScript(script,true);
+  return Array.isArray(results)?results.filter(x=>/^\d{6}$/.test(String(x.code||""))).slice(0,35).map(x=>({
+   code:String(x.code),name:String(x.name||x.code).slice(0,80),market:String(x.market||"KRX").slice(0,40)
+  })):[];
+ }catch{return []}
+});
 ipcMain.on("hts:refresh",e=>{if(fromWorkspace(e))refreshPanes()});
 ipcMain.on("hts:reconnect",e=>{if(fromWorkspace(e))refreshPanes()});
 ipcMain.on("hts:popout",(e,kind)=>{if(fromWorkspace(e))popout(kind)});
