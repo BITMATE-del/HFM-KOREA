@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none';">
+<title>HFM KOREA HTS | 전문 트레이딩 터미널</title>
+<style>
+:root{font-family:"Malgun Gothic","Apple SD Gothic Neo",Arial,sans-serif;color:#1e304a;background:#eef2f8}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;overflow:hidden}button,input{font:inherit}button{cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid #4a75e5;outline-offset:2px}
+#top{height:57px;background:#172f56;color:#fff;display:flex;align-items:center;gap:17px;padding:0 19px;border-bottom:1px solid #25476e}
+.brand{display:flex;align-items:center;gap:10px;min-width:195px}.logo{width:32px;height:32px;display:grid;place-items:center;border:1px solid #86b8ee;border-radius:7px;font-weight:900;color:#a5cdff}.brand b{font-size:15px;letter-spacing:.6px}.brand small{display:block;color:#adc4e0;font-size:10px;letter-spacing:1px;margin-top:2px}
+.mode-buttons{display:flex;gap:5px}.mode-buttons button{border:0;border-radius:6px;background:transparent;color:#b8cde8;padding:9px 15px;font-size:12px;font-weight:700}.mode-buttons button.active{background:#2f5c9b;color:white}
+.top-end{margin-left:auto;display:flex;align-items:center;gap:9px}.status{display:flex;align-items:center;gap:6px;font-size:11px;color:#bdd0e8}.dot{width:7px;height:7px;border-radius:50%;background:#e2b35e}.status.ready .dot{background:#60d5a1}.top-end button{border:1px solid #3c5f90;background:#23416b;color:#e5f1ff;border-radius:6px;font-size:11px;padding:8px 11px}
+#surface{height:calc(100vh - 57px);position:relative;padding:12px}
+#loginSurface{position:absolute;inset:12px;border:1px solid #dce5f0;background:#fff;border-radius:10px;overflow:hidden}
+#dashboard{height:100%;display:grid;grid-template-columns:194px minmax(0,1fr);gap:10px}
+#dashboard[hidden],#loginSurface[hidden]{display:none}
+nav{border:1px solid #dce4f0;border-radius:10px;background:#fff;padding:12px;min-height:0;display:flex;flex-direction:column}
+nav h3{font-size:11px;color:#73829b;letter-spacing:1px;margin:3px 4px 11px}
+#symbolSearch{width:100%;border:1px solid #dbe4ef;border-radius:6px;padding:9px;font-size:12px;color:#193356;margin-bottom:10px}
+#symbols{overflow:auto;flex:1}#symbols button{width:100%;display:flex;align-items:center;justify-content:space-between;text-align:left;border:1px solid transparent;background:transparent;padding:11px 10px;border-radius:8px;font-size:12px;color:#344b6b;margin:2px 0}
+#symbols button b{font-size:12px}#symbols button small{font-size:10px;color:#8293ab}#symbols button.active{border-color:#b8cdef;background:#ecf3ff;color:#1c54aa}
+.nav-footer{font-size:10px;color:#8593a8;padding:13px 5px 3px;border-top:1px solid #e4eaf3;line-height:1.7}
+#panes{display:grid;min-height:0;gap:10px;grid-template-columns:minmax(0,1fr) 330px;grid-template-rows:minmax(320px,1fr) minmax(170px,31%)}
+.pane{min-width:0;min-height:0;border:1px solid #dce4f0;border-radius:9px;overflow:hidden;background:white;display:flex;flex-direction:column}
+.pane-head{height:39px;flex:0 0 39px;background:#f9fbfe;border-bottom:1px solid #e4eaf3;padding:0 11px 0 14px;display:flex;align-items:center;gap:8px}
+.pane-head b{font-size:12px;color:#274267}.pane-head small{font-size:10px;color:#8294a9}.pane-head button{margin-left:auto;background:#fff;border:1px solid #d8e4f1;border-radius:5px;color:#617d9f;font-size:11px;padding:4px 8px}
+.slot{flex:1;position:relative;min-height:0;background:#fff}
+#positionsPane{grid-column:1/-1}
+#statusText{position:absolute;right:20px;bottom:15px;pointer-events:none;font-size:10px;color:#748ba8;z-index:3}
+#mainAuthNote{position:absolute;top:16px;left:24px;font-size:11px;color:#7184a3;z-index:1;pointer-events:none}
+body.compact #panes{grid-template-columns:minmax(0,1fr) 300px;grid-template-rows:minmax(290px,1fr) minmax(150px,25%)}
+@media(max-width:1080px){#dashboard{grid-template-columns:155px minmax(0,1fr)}#panes{grid-template-columns:minmax(0,1fr) 275px;grid-template-rows:minmax(290px,1fr) minmax(140px,27%)}.brand{min-width:155px}}
+</style></head>
+<body>
+<header id="top">
+ <div class="brand"><span class="logo">H</span><div><b>HFM KOREA</b><small>HTS TERMINAL</small></div></div>
+ <div class="mode-buttons"><button data-mode="futures" class="active">해외선물</button><button data-mode="stocks">국내주식</button></div>
+ <div class="top-end"><span class="status" id="connectState"><span class="dot"></span><span id="connectLabel">서버 연결 중</span></span><button id="refresh">새로고침</button><button id="preset">화면 정리</button></div>
+</header>
+<section id="surface">
+ <div id="loginSurface"><div id="mainAuthNote">HFM KOREA 회원 계정으로 로그인하세요.</div></div>
+ <div id="dashboard" hidden>
+  <nav><h3>종목 빠른 선택</h3><input id="symbolSearch" type="search" placeholder="종목명 / 코드 검색" autocomplete="off">
+   <div id="symbols"></div>
+   <div class="nav-footer">실제 시세 및 주문은 HFM 서버의 기존 기능을 사용합니다. 작업 영역만 HTS 전용으로 분리했습니다.</div>
+  </nav>
+  <main id="panes">
+   <section class="pane" id="chartPane"><div class="pane-head"><b>차트 · 시세</b><small id="chartTitle">나스닥 100</small><button data-popout="chart">별도 창</button></div><div class="slot" id="chartSlot"></div></section>
+   <section class="pane" id="orderPane"><div class="pane-head"><b>주문</b><small>기존 주문 엔진 연결</small><button data-popout="order">별도 창</button></div><div class="slot" id="orderSlot"></div></section>
+   <section class="pane" id="positionsPane"><div class="pane-head"><b>보유 포지션 · 미체결 · 체결 내역</b><button data-popout="positions">별도 창</button></div><div class="slot" id="positionsSlot"></div></section>
+  </main>
+ </div>
+ <span id="statusText"></span>
+</section>
+<script src="./workspace.js"></script></body></html>
