@@ -1,5 +1,5 @@
 {
-  "name": "veltro-hts-desktop",
+  "name": "hfm-korea-hts-desktop",
   "version": "0.1.0",
   "private": true,
   "description": "VELTRO Windows HTS desktop client using existing authenticated WTS backend",
@@ -14,8 +14,8 @@
     "electron-builder": "26.18.0"
   },
   "build": {
-    "appId": "kr.co.veltro.hts",
-    "productName": "VELTRO HTS",
+    "appId": "kr.co.hfmkorea.hts",
+    "productName": "HFM KOREA HTS",
     "directories": {
       "output": "dist"
     },
@@ -47,10 +47,10 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "artifactName": "VELTRO-HTS-Setup-${version}-${arch}.${ext}"
+      "artifactName": "HFM-KOREA-HTS-Setup-${version}-${arch}.${ext}"
     },
     "portable": {
-      "artifactName": "VELTRO-HTS-Portable-${version}-${arch}.${ext}"
+      "artifactName": "HFM-KOREA-HTS-Portable-${version}-${arch}.${ext}"
     }
   }
 }
