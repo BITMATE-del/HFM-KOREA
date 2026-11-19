@@ -9,6 +9,9 @@ contextBridge.exposeInMainWorld("hts",Object.freeze({
  reconnect:()=>ipcRenderer.send("hts:reconnect"),
  popout:(kind)=>ipcRenderer.send("hts:popout",kind),
  preset:(name)=>ipcRenderer.send("hts:preset",name),
+ updateCheck:()=>ipcRenderer.send("hts:update-check"),
+ updateInstall:()=>ipcRenderer.send("hts:update-install"),
+ onUpdate:(fn)=>{const cb=(_event,value)=>fn(value);ipcRenderer.on("hts:update",cb);return()=>ipcRenderer.removeListener("hts:update",cb)},
  onAuth:(fn)=>{const cb=(_event,value)=>fn(value);ipcRenderer.on("hts:auth",cb);return()=>ipcRenderer.removeListener("hts:auth",cb)},
  onStatus:(fn)=>{const cb=(_event,value)=>fn(value);ipcRenderer.on("hts:status",cb);return()=>ipcRenderer.removeListener("hts:status",cb)},
  onSymbolChanged:(fn)=>{const cb=(_event,value)=>fn(value);ipcRenderer.on("hts:symbol-changed",cb);return()=>ipcRenderer.removeListener("hts:symbol-changed",cb)}
