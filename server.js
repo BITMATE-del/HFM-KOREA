@@ -37,11 +37,11 @@ async function massiveFetch(path,params){
  if(!key)return {code:"MISSING_KEY",ok:false};
  const now=Date.now(),id=path+"?"+new URLSearchParams(params).toString();
  const cached=massiveState.cache.get(id);
- if(cached && now-cached.at<180000)return cached.value;
+ if(cached && now-cached.at<(path.startsWith("/futures/v1/aggs/")?15000:180000))return cached.value;
  if(massiveState.pending.has(id))return massiveState.pending.get(id);
  if(now<massiveState.nextAt)return {code:"COOLDOWN",ok:false,retryAfter:Math.ceil((massiveState.nextAt-now)/1000)};
  // Globally serialized across all check routes, leaving room under 5/minute.
- massiveState.nextAt=now+16000;
+ massiveState.nextAt=now+(process.env.MASSIVE_FUTURES_PAID==="true"?750:16000);
  const request=(async()=>{
   const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),7000);
   try{
@@ -267,6 +267,35 @@ http.createServer(async (req,res)=>{
     console.warn("STOCK_FEED_ERROR",{kind:url.pathname.endsWith("/quote")?"quote":"chart",symbol,reason:String(e.message||"UNAVAILABLE").slice(0,55)});
     return jsonResponse(res,503,{error:"STOCK_DATA_UNAVAILABLE",symbol});
    }
+  }
+  if(url.pathname==="/api/futures/market"){
+   if(req.method!=="GET")return jsonResponse(res,405,{error:"METHOD_NOT_ALLOWED"});
+   const member=await appApi.auth(req);
+   if(!member)return jsonResponse(res,401,{error:"LOGIN_REQUIRED"});
+   const product=(url.searchParams.get("product")||"NQ").toUpperCase();
+   const period=url.searchParams.get("period")||"1min";
+   const intervals=new Set(["1min","5min","15min","1hour","1session"]);
+   if(!VALID_PRODUCTS.has(product)||!intervals.has(period))return jsonResponse(res,400,{error:"INVALID_FUTURES_PERIOD_OR_SYMBOL"});
+   const date=new Date().toISOString().slice(0,10);
+   const contracts=await massiveFetch("/futures/v1/contracts",{product_code:product,date,active:"true",type:"single",limit:"100",sort:"ticker.asc"});
+   if(!contracts.ok)return jsonResponse(res,503,{error:"CONTRACTS_UNAVAILABLE",reason:contracts.code});
+   const chosen=chooseContract(contracts.results,product);
+   if(!chosen)return jsonResponse(res,404,{error:"NO_ACTIVE_CONTRACT"});
+   const bars=await massiveFetch("/futures/v1/aggs/"+encodeURIComponent(chosen.ticker),{resolution:period,sort:"window_start.desc",limit:period==="1session"?"250":"450"});
+   if(!bars.ok)return jsonResponse(res,503,{error:"FUTURES_BARS_UNAVAILABLE",reason:bars.code});
+   const items=bars.results.map(x=>{
+    let time;try{time=Number(BigInt(String(x.window_start))/1000000000n)}catch{return null}
+    const open=Number(x.open),high=Number(x.high),low=Number(x.low),close=Number(x.close),volume=Number(x.volume||0);
+    if(!Number.isSafeInteger(time)||time<1000000000||![open,high,low,close,volume].every(Number.isFinite)||
+       open<=0||close<=0||high<Math.max(open,close)||low>Math.min(open,close)||volume<0)return null;
+    return {time,open,high,low,close,volume};
+   }).filter(Boolean).sort((a,b)=>a.time-b.time).filter((x,i,all)=>!i||x.time!==all[i-1].time);
+   if(!items.length)return jsonResponse(res,503,{error:"FUTURES_BARS_EMPTY"});
+   const latest=items[items.length-1],oldMs=Date.now()-latest.time*1000;
+   return jsonResponse(res,200,{product,contract:chosen.ticker,period,source:"MASSIVE_FUTURES",
+    quote:{price:latest.close,asOf:new Date(latest.time*1000).toISOString(),ageSeconds:Math.max(0,Math.floor(oldMs/1000)),
+     fresh:oldMs<180000,previousClose:items.length>1?items[items.length-2].close:null},
+    candles:items,updatedAt:new Date().toISOString()});
   }
   if(url.pathname==="/api/futures/provider-status"){
    if(req.method!=="GET")return jsonResponse(res,405,{ok:false,code:"METHOD_NOT_ALLOWED"});
