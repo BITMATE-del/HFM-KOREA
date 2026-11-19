@@ -186,3 +186,51 @@ button,input,select,textarea{font-family:inherit!important}
 #platform .header-right .header-tool-btn svg{width:18px!important;height:18px!important;display:block!important;flex:none!important;stroke-width:1.8!important}
 #platform .header-right .header-tool-btn .dot{display:none!important}
 @media(max-width:650px){#platform .header-right .header-tool-btn{width:33px!important;height:33px!important;min-height:33px!important}}
+
+/* Domestic stocks: use the removed orderbook's full width for the chart.
+   Keep the futures three-panel layout untouched. */
+#platform .trading-layout.stock-no-orderbook{
+ display:grid!important;
+ grid-template-columns:minmax(0,1fr) 290px!important;
+ gap:10px!important;
+ width:100%!important;
+ align-items:stretch!important;
+}
+#platform .trading-layout.stock-no-orderbook>.orderbook-panel{display:none!important}
+#platform .trading-layout.stock-no-orderbook>.chart-panel{
+ grid-column:1!important;
+ grid-row:1!important;
+ min-width:0!important;
+ width:100%!important;
+}
+#platform .trading-layout.stock-no-orderbook>.order-panel{
+ grid-column:2!important;
+ grid-row:1!important;
+ min-width:0!important;
+ width:100%!important;
+ min-height:565px!important;
+}
+#platform .trading-layout.stock-no-orderbook .order-body{display:block!important}
+#platform .trading-layout.stock-no-orderbook .chart-stage,
+#platform .trading-layout.stock-no-orderbook .hfm-market-chart-stage,
+#platform .trading-layout.stock-no-orderbook .hfm-market-chart{min-width:0!important;width:100%!important}
+@media(max-width:1180px){
+ #platform .trading-layout.stock-no-orderbook{grid-template-columns:minmax(0,1fr) 280px!important}
+ #platform .trading-layout.stock-no-orderbook>.order-panel{grid-column:2!important;grid-row:1!important;min-height:470px!important}
+ #platform .trading-layout.stock-no-orderbook .order-body{display:block!important}
+}
+@media(max-width:760px){
+ #platform .trading-layout.stock-no-orderbook{grid-template-columns:minmax(0,1fr)!important}
+ #platform .trading-layout.stock-no-orderbook>.chart-panel{grid-column:1!important;grid-row:1!important}
+ #platform .trading-layout.stock-no-orderbook>.order-panel{grid-column:1!important;grid-row:2!important;min-height:auto!important}
+ #platform .trading-layout.stock-no-orderbook .order-body{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}
+ #platform .trading-layout.stock-no-orderbook .order-body .order-fields{grid-column:1!important}
+ #platform .trading-layout.stock-no-orderbook .order-body .order-info{grid-column:2!important}
+ #platform .trading-layout.stock-no-orderbook .order-body .trade-buttons{grid-column:1/-1!important}
+}
+@media(max-width:390px){
+ #platform .trading-layout.stock-no-orderbook .order-body{grid-template-columns:minmax(0,1fr)!important}
+ #platform .trading-layout.stock-no-orderbook .order-body .order-fields,
+ #platform .trading-layout.stock-no-orderbook .order-body .order-info,
+ #platform .trading-layout.stock-no-orderbook .order-body .trade-buttons{grid-column:1!important}
+}
