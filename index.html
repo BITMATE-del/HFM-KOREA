@@ -48,8 +48,8 @@ const money=(n)=>fmt(Math.round(n))+'원';
 const dt=(iso)=>new Date(iso).toLocaleString('ko-KR',{hour12:false});
 const now=()=>new Date().toISOString();
 const symbols=[
- {id:'NQ',name:'나스닥 100 선물',code:'NQ',market:'CME',currency:'USD',price:27348.5,tick:.25,mult:20,margin:3000000,kind:'futures'},
- {id:'MNQ',name:'마이크로 나스닥',code:'MNQ',market:'CME',currency:'USD',price:27348.5,tick:.25,mult:2,margin:420000,kind:'futures'},
+ {id:'NQ',name:'나스닥 100 선물',code:'NQ',market:'CME',currency:'USD',price:27348.5,tick:.25,mult:20,margin:300000,kind:'futures'},
+ {id:'MNQ',name:'마이크로 나스닥',code:'MNQ',market:'CME',currency:'USD',price:27348.5,tick:.25,mult:2,margin:30000,kind:'futures'},
  {id:'ES',name:'S&P 500 선물',code:'ES',market:'CME',currency:'USD',price:7403.25,tick:.25,mult:50,margin:2500000,kind:'futures'},
  {id:'MES',name:'마이크로 S&P 500',code:'MES',market:'CME',currency:'USD',price:7403.25,tick:.25,mult:5,margin:330000,kind:'futures'},
  {id:'GC',name:'금 선물',code:'GC',market:'COMEX',currency:'USD',price:3878.4,tick:.1,mult:100,margin:3500000,kind:'futures'},
