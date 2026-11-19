@@ -82,9 +82,9 @@ async function executeInTransaction(c,userId,o,q){
  let delta=0,realized=null,margin=0;
  if(fill){
   if(o.action==="OPEN"){
-   const prev=await c.query("SELECT symbol,qty FROM hf_futures_internal_positions WHERE user_id=$1 AND state='OPEN'",[userId]);
+   const prev=await c.query("SELECT symbol,qty,margin_krw FROM hf_futures_internal_positions WHERE user_id=$1 AND state='OPEN'",[userId]);
    const legacy=await c.query("SELECT symbol,qty FROM hf_positions WHERE user_id=$1 AND state='OPEN' AND product='FUTURES'",[userId]);
-   const locked=[...prev.rows,...legacy.rows].reduce((sum,p)=>sum+calc.marginFor(p.symbol,p.qty),0);
+   const locked=prev.rows.reduce((sum,p)=>sum+Number(p.margin_krw),0)+legacy.rows.reduce((sum,p)=>sum+calc.marginFor(p.symbol,p.qty),0);
    const pending=await c.query("SELECT COALESCE(SUM(amount),0)::bigint AS amount FROM hf_funding_requests WHERE user_id=$1 AND account='FUTURES' AND kind='WITHDRAW' AND status='PENDING'",[userId]);
    margin=calc.marginFor(o.symbol,o.qty);
    if(calc.availableMargin({balanceKrw:balance,lockedKrw:locked,pendingWithdrawalsKrw:Number(pending.rows[0].amount)})<margin+fee)fail("INSUFFICIENT_MARGIN");
@@ -130,10 +130,10 @@ async function matchPending(quoteProvider){
    if(member.rows[0]?.status!=="ACTIVE"||restriction.rows[0]?.futures_blocked){await c.query("ROLLBACK");continue}
    checkQuote(q,order.symbol);
    const current=Number(wallet.rows[0].futures_balance),fee=calc.feesFor(order.qty),margin=calc.marginFor(order.symbol,order.qty);
-   const prev=await c.query("SELECT symbol,qty FROM hf_futures_internal_positions WHERE user_id=$1 AND state='OPEN'",[order.user_id]);
+   const prev=await c.query("SELECT symbol,qty,margin_krw FROM hf_futures_internal_positions WHERE user_id=$1 AND state='OPEN'",[order.user_id]);
    const legacy=await c.query("SELECT symbol,qty FROM hf_positions WHERE user_id=$1 AND product='FUTURES' AND state='OPEN'",[order.user_id]);
    const pending=await c.query("SELECT COALESCE(SUM(amount),0)::bigint AS amount FROM hf_funding_requests WHERE user_id=$1 AND account='FUTURES' AND kind='WITHDRAW' AND status='PENDING'",[order.user_id]);
-   const used=[...prev.rows,...legacy.rows].reduce((n,p)=>n+calc.marginFor(p.symbol,p.qty),0);
+   const used=prev.rows.reduce((n,p)=>n+Number(p.margin_krw),0)+legacy.rows.reduce((n,p)=>n+calc.marginFor(p.symbol,p.qty),0);
    if(calc.availableMargin({balanceKrw:current,lockedKrw:used,pendingWithdrawalsKrw:Number(pending.rows[0].amount)})<margin+fee){await c.query("ROLLBACK");continue}
    const px=quotePrice(obj,q);
    await c.query("UPDATE hf_futures_internal_orders SET status='FILLED',fill_price=$2,fee_krw=$3,source=$4,quote_at=$5,fx_krw=1400,updated_at=NOW() WHERE id=$1",[order.id,px,fee,q.source,q.asOf]);
@@ -189,7 +189,7 @@ async function rollbackSmoke(){
   const retry=await executeInTransaction(c,userId,open,quote(22000));
   if(!retry.duplicate||retry.order.id!==bought.order.id)fail("SMOKE_DUPLICATE_FAILED");
   const opened=await c.query("SELECT * FROM hf_futures_internal_positions WHERE open_order_id=$1",[bought.order.id]);
-  if(opened.rowCount!==1||Number(opened.rows[0].margin_krw)!==3000000)fail("SMOKE_MARGIN_FAILED");
+  if(opened.rowCount!==1||Number(opened.rows[0].margin_krw)!==300000)fail("SMOKE_MARGIN_FAILED");
   const close={symbol:"NQ",side:"SELL",qty:1,type:"MARKET",action:"CLOSE",key:crypto.randomUUID(),limit:null,positionId:opened.rows[0].id};
   const sold=await executeInTransaction(c,userId,close,quote(22001.25));
   if(sold.order.status!=="FILLED"||Number(sold.order.realizedPnlKrw)!==26500)fail("SMOKE_CLOSE_FAILED");
