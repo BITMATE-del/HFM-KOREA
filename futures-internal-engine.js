@@ -125,6 +125,9 @@ async function matchPending(quoteProvider){
   const c=await pool.connect();try{
    await c.query("BEGIN");const wallet=await c.query("SELECT futures_balance FROM hf_wallets WHERE user_id=$1 FOR UPDATE",[order.user_id]);if(!wallet.rowCount){await c.query("ROLLBACK");continue}
    const locked=await c.query("SELECT * FROM hf_futures_internal_orders WHERE id=$1 AND status='HELD' FOR UPDATE",[order.id]);if(!locked.rowCount){await c.query("ROLLBACK");continue}
+   const member=await c.query("SELECT status FROM hf_users WHERE id=$1",[order.user_id]);
+   const restriction=await c.query("SELECT futures_blocked FROM hf_member_restrictions WHERE user_id=$1",[order.user_id]);
+   if(member.rows[0]?.status!=="ACTIVE"||restriction.rows[0]?.futures_blocked){await c.query("ROLLBACK");continue}
    checkQuote(q,order.symbol);
    const current=Number(wallet.rows[0].futures_balance),fee=calc.feesFor(order.qty),margin=calc.marginFor(order.symbol,order.qty);
    const prev=await c.query("SELECT symbol,qty FROM hf_futures_internal_positions WHERE user_id=$1 AND state='OPEN'",[order.user_id]);
