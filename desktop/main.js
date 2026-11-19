@@ -3,6 +3,7 @@ const path=require("node:path");
 const {app,BrowserWindow,WebContentsView,Menu,shell,dialog,session,screen,ipcMain}=require("electron");
 const {HOME_URL,isTrustedAppUrl,isExternalAllowed}=require("./config.cjs");
 const {MODES,paneCSS,selectPageScript,selectSymbolScript}=require("./layout.cjs");
+const {initAutoUpdate}=require("./updater.cjs");
 
 app.setAppUserModelId("kr.co.hfmkorea.hts");
 if(!app.requestSingleInstanceLock())app.quit();
@@ -11,6 +12,7 @@ let windowRef=null,authenticated=false,activePage="futures",activeSymbol="NQ",qu
 const panes=new Map(),positions={chart:null,order:null,positions:null};
 const popouts=new Set();
 let authTimer=null;
+let updaterControl={enabled:false};
 
 function send(name,value){
  if(windowRef&&!windowRef.isDestroyed()&&!windowRef.webContents.isDestroyed())windowRef.webContents.send(name,value);
@@ -263,6 +265,8 @@ ipcMain.handle("hts:search-stocks",async(e,query)=>{
   })):[];
  }catch{return []}
 });
+ipcMain.on("hts:update-check",e=>{if(fromWorkspace(e))updaterControl.check?.()});
+ipcMain.on("hts:update-install",e=>{if(fromWorkspace(e))updaterControl.install?.()});
 ipcMain.on("hts:refresh",e=>{if(fromWorkspace(e))refreshPanes()});
 ipcMain.on("hts:reconnect",e=>{if(fromWorkspace(e))refreshPanes()});
 ipcMain.on("hts:popout",(e,kind)=>{if(fromWorkspace(e))popout(kind)});
@@ -278,6 +282,13 @@ app.whenReady().then(()=>{
  session.defaultSession.setPermissionRequestHandler((_wc,_permission,callback)=>callback(false));
  session.defaultSession.setPermissionCheckHandler(()=>false);
  loadWorkspace();
+ try{
+  const {autoUpdater}=require("electron-updater");
+  updaterControl=initAutoUpdate({app,send,autoUpdater});
+ }catch(error){
+  console.warn("HTS update initialization skipped:",String(error?.message||error).slice(0,100));
+  send("hts:update",{status:"error",message:"업데이트 서비스에 연결할 수 없습니다.",version:app.getVersion()});
+ }
  app.on("activate",()=>{if(!BrowserWindow.getAllWindows().length)loadWorkspace()});
 }).catch(console.error);
 app.on("window-all-closed",()=>{if(process.platform!=="darwin")app.quit()});
