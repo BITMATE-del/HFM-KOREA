@@ -35,10 +35,28 @@ function applyBounds(){
   pane.setVisible(true);
  }
 }
+async function enforcePane(name,contents){
+ if(!isTrustedAppUrl(contents.getURL()))return;
+ try{
+  const css=paneCSS(name);
+  // insertCSS is also applied to the authenticated WTS after a full navigation.
+  // A document-owned style survives WTS DOM rewrites and takes the highest cascade priority.
+  await contents.insertCSS(css);
+  await contents.executeJavaScript(
+   "(()=>{let e=document.getElementById('hfm-hts-pane-css');if(!e){e=document.createElement('style');e.id='hfm-hts-pane-css';document.head.appendChild(e)}e.textContent="+JSON.stringify(css)+";return true})()",true
+  );
+ }catch(e){console.warn("HTS pane styling failed:",name,e.message)}
+}
 async function navigatePane(name,page){
- const pane=panes.get(name);if(!pane||pane.webContents.isDestroyed())return;
- try{await pane.webContents.executeJavaScript(selectPageScript(page),true)}
- catch(e){console.warn("HTS navigation:",name,e.message)}
+ const pane=panes.get(name);if(!pane||pane.webContents.isDestroyed()||!isTrustedAppUrl(pane.webContents.getURL()))return;
+ const wc=pane.webContents;
+ try{
+  const ready=await wc.executeJavaScript(
+   "Boolean(document.querySelector('#platform:not(.hidden) .nav-item[data-page=\\\""+page+"\\\"]'))",true);
+  if(!ready)return;
+  await wc.executeJavaScript(selectPageScript(page),true);
+  await enforcePane(name,wc);
+ }catch(e){console.warn("HTS navigation:",name,e.message)}
 }
 async function chooseSymbol(symbol,label="",market=""){
  activeSymbol=symbol;
@@ -52,11 +70,10 @@ async function chooseSymbol(symbol,label="",market=""){
 async function onPaneLoaded(name,contents){
  if(!isTrustedAppUrl(contents.getURL()))return;
  try{
-  await contents.insertCSS(paneCSS(name));
-  if(name!=="chart"||authenticated){
-   // Account restore uses the original authenticated backend and may finish asynchronously.
-   setTimeout(()=>navigatePane(name,activePage),1100);
-  }
+  await enforcePane(name,contents);
+  // The backend may restore the cookie asynchronously; navigation and pane CSS are
+  // retried after the page becomes authenticated, not just once at a fixed delay.
+  setTimeout(()=>navigatePane(name,activePage),1200);
   if(name==="chart")pollAuthentication();
  }catch(e){console.warn("HTS layout failed:",name,e.message)}
 }
@@ -96,9 +113,19 @@ async function pollAuthentication(){
    send("hts:auth",authenticated);
    if(authenticated){
     createPane("order");createPane("positions");
-    for(const name of ["order","positions"])navigatePane(name,activePage);
+    for(const name of MODES)navigatePane(name,activePage);
    }
    applyBounds();
+  }
+  if(loggedIn){
+   // Newly initialized views often finish account restoration after did-finish-load.
+   for(const name of ["order","positions"]){
+    const view=panes.get(name);
+    if(!view||view.webContents.isDestroyed()||!isTrustedAppUrl(view.webContents.getURL()))continue;
+    const current=await view.webContents.executeJavaScript(
+     "document.querySelector('.nav-item.selected')?.dataset.page||''",true).catch(()=>"");
+    if(current!==activePage)navigatePane(name,activePage);
+   }
   }
   if(loggedIn&&activePage==="stocks"){
    const current=await chart.webContents.executeJavaScript(
