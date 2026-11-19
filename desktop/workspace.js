@@ -6,20 +6,44 @@ const symbols=[
  {code:"CL",name:"WTI 원유"},{code:"HSI",name:"항셍지수"}
 ];
 let signedIn=false,activePage="futures",selectedSymbol="NQ",pendingLayout=false;
+let stockMatches=[],stockRequest=0,stockTimer=null;
 const $=id=>document.getElementById(id);
 function renderSymbols(){
  const q=$("symbolSearch").value.trim().toLocaleLowerCase("ko-KR");
  const list=$("symbols");list.replaceChildren();
- const filtered=symbols.filter(s=>(s.code+" "+s.name).toLocaleLowerCase("ko-KR").includes(q));
- for(const item of filtered){
+ const entries=activePage==="futures"
+  ?symbols.filter(s=>(s.code+" "+s.name).toLocaleLowerCase("ko-KR").includes(q))
+  :stockMatches.filter(s=>(s.code+" "+s.name+" "+s.market).toLocaleLowerCase("ko-KR").includes(q));
+ for(const item of entries){
   const b=document.createElement("button");b.className=selectedSymbol===item.code?"active":"";
-  b.type="button";b.innerHTML="<b>"+item.name+"</b><small>"+item.code+"</small>";
+  b.type="button";
+  const name=document.createElement("b");name.textContent=item.name;
+  const code=document.createElement("small");code.textContent=item.code;
+  b.append(name,code);
   b.addEventListener("click",()=>{
    selectedSymbol=item.code;$("chartTitle").textContent=item.name;
-   renderSymbols();window.hts.symbol(item.code);
+   renderSymbols();window.hts.symbol(item.code,item.name,item.market||"");
   });list.append(b);
  }
- if(!filtered.length){const p=document.createElement("p");p.textContent="일치하는 종목이 없습니다.";p.style.cssText="font-size:12px;color:#8192aa;padding:10px";list.append(p)}
+ if(!entries.length){
+  const p=document.createElement("p");
+  p.textContent=activePage==="stocks"&&!q?"국내주식 종목명 또는 종목코드를 검색하세요.":activePage==="stocks"?"검색 결과가 없습니다.":"일치하는 종목이 없습니다.";
+  p.style.cssText="font-size:12px;color:#8192aa;padding:10px;line-height:1.7";
+  list.append(p);
+ }
+}
+async function fetchStockMatches(){
+ if(activePage!=="stocks"||!signedIn)return;
+ const q=$("symbolSearch").value.trim();
+ const seq=++stockRequest;
+ if(!q){stockMatches=[];renderSymbols();return}
+ $("symbols").textContent="종목을 검색하고 있습니다...";
+ try{
+  const found=await window.hts.searchStocks(q);
+  if(seq===stockRequest&&activePage==="stocks"){stockMatches=Array.isArray(found)?found:[];renderSymbols()}
+ }catch{
+  if(seq===stockRequest){stockMatches=[];renderSymbols()}
+ }
 }
 function bounds(id){
  const r=$(id).getBoundingClientRect();
@@ -47,15 +71,27 @@ document.querySelectorAll("[data-mode]").forEach(button=>button.addEventListener
  if(activePage==="stocks")$("chartTitle").textContent="국내주식";
  else $("chartTitle").textContent=symbols.find(s=>s.code===selectedSymbol)?.name||selectedSymbol;
  window.hts.page(activePage);
+ $("symbolSearch").value="";
+ if(activePage==="stocks"){selectedSymbol="";stockMatches=[];renderSymbols()}
+ else {selectedSymbol="NQ";renderSymbols();setTimeout(()=>window.hts.symbol("NQ","나스닥 100","CME"),500)}
 }));
 document.querySelectorAll("[data-popout]").forEach(b=>b.addEventListener("click",()=>window.hts.popout(b.dataset.popout)));
 $("refresh").addEventListener("click",()=>window.hts.refresh());
 $("preset").addEventListener("click",()=>{document.body.classList.toggle("compact");scheduleLayout();});
-$("symbolSearch").addEventListener("input",renderSymbols);
+$("symbolSearch").addEventListener("input",()=>{
+ if(activePage==="stocks"){clearTimeout(stockTimer);stockTimer=setTimeout(fetchStockMatches,230)}
+ else renderSymbols();
+});
 window.addEventListener("resize",scheduleLayout);
 new ResizeObserver(scheduleLayout).observe($("surface"));
 new ResizeObserver(scheduleLayout).observe($("dashboard"));
 window.hts.onAuth(setSignedIn);
+window.hts.onSymbolChanged?.(item=>{
+ if(!item||typeof item.symbol!=="string")return;
+ selectedSymbol=item.symbol;
+ if(item.label)$("chartTitle").textContent=item.label;
+ renderSymbols();
+});
 window.hts.onStatus(s=>{
  if(s?.message)$("statusText").textContent=s.message;
  if(s?.offline){$("connectState").classList.remove("ready");$("connectLabel").textContent="서버 재연결 필요";}
