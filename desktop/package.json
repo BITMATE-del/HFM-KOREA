@@ -28,7 +28,8 @@
       "workspace.js",
       "offline.html",
       "package.json",
-      "updater.cjs"
+      "updater.cjs",
+      "hts-theme.css"
     ],
     "asar": true,
     "win": {
