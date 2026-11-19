@@ -1,0 +1,54 @@
+{
+  "name": "veltro-hts-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "VELTRO Windows HTS desktop client using existing authenticated WTS backend",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/*.test.cjs",
+    "dist:win": "electron-builder --win nsis portable --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "45.3.4",
+    "electron-builder": "26.0.20"
+  },
+  "build": {
+    "appId": "kr.co.veltro.hts",
+    "productName": "VELTRO HTS",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "config.cjs",
+      "offline.html",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "VELTRO-HTS-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "publish": null
+  }
+}
