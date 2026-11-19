@@ -10,5 +10,6 @@ contextBridge.exposeInMainWorld("hts",Object.freeze({
  popout:(kind)=>ipcRenderer.send("hts:popout",kind),
  preset:(name)=>ipcRenderer.send("hts:preset",name),
  onAuth:(fn)=>{const cb=(_event,value)=>fn(value);ipcRenderer.on("hts:auth",cb);return()=>ipcRenderer.removeListener("hts:auth",cb)},
- onStatus:(fn)=>{const cb=(_event,value)=>fn(value);ipcRenderer.on("hts:status",cb);return()=>ipcRenderer.removeListener("hts:status",cb)}
+ onStatus:(fn)=>{const cb=(_event,value)=>fn(value);ipcRenderer.on("hts:status",cb);return()=>ipcRenderer.removeListener("hts:status",cb)},
+ onSymbolChanged:(fn)=>{const cb=(_event,value)=>fn(value);ipcRenderer.on("hts:symbol-changed",cb);return()=>ipcRenderer.removeListener("hts:symbol-changed",cb)}
 }));
