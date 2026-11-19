@@ -169,4 +169,36 @@ async function route(req,res,url,quoteProvider){
   send(res,code==="FUTURES_TRADING_RESTRICTED"||code==="ORIGIN_MISMATCH"?403:code==="INSUFFICIENT_MARGIN"||code==="INSUFFICIENT_SETTLEMENT_BALANCE"||code==="POSITION_NOT_OPEN"||code==="ORDER_NOT_HELD"||code==="IDEMPOTENCY_CONFLICT"?409:expected.has(code)?400:503,{error:expected.has(code)?code:"FUTURES_INTERNAL_UNAVAILABLE"});return true;
  }
 }
-module.exports={ensure,route,state,input,checkQuote,execute,matchPending,executeInTransaction};
+
+async function rollbackSmoke(){
+ await ensure();
+ const c=await pool.connect();
+ try{
+  await c.query("BEGIN");
+  const username="smoke_futures_"+crypto.randomBytes(8).toString("hex");
+  const member=await c.query("INSERT INTO hf_users(username,password_hash,full_name,phone) VALUES($1,'SMOKE_NO_LOGIN','검증','00000000000') RETURNING id",[username]);
+  const userId=member.rows[0].id;
+  await c.query("INSERT INTO hf_wallets(user_id,futures_balance) VALUES($1,10000000)",[userId]);
+  const quote=price=>({symbol:"NQ",bid:price,ask:price+.25,asOf:new Date().toISOString(),source:"MASSIVE_FUTURES",licensed:true,marketOpen:true});
+  const open={symbol:"NQ",side:"BUY",qty:1,type:"MARKET",action:"OPEN",key:crypto.randomUUID(),limit:null,positionId:null};
+  const bought=await executeInTransaction(c,userId,open,quote(22000));
+  if(bought.order.status!=="FILLED"||Number(bought.order.fillPrice)!==22000.25)fail("SMOKE_OPEN_FAILED");
+  const retry=await executeInTransaction(c,userId,open,quote(22000));
+  if(!retry.duplicate||retry.order.id!==bought.order.id)fail("SMOKE_DUPLICATE_FAILED");
+  const opened=await c.query("SELECT * FROM hf_futures_internal_positions WHERE open_order_id=$1",[bought.order.id]);
+  if(opened.rowCount!==1||Number(opened.rows[0].margin_krw)!==3000000)fail("SMOKE_MARGIN_FAILED");
+  const close={symbol:"NQ",side:"SELL",qty:1,type:"MARKET",action:"CLOSE",key:crypto.randomUUID(),limit:null,positionId:opened.rows[0].id};
+  const sold=await executeInTransaction(c,userId,close,quote(22001.25));
+  if(sold.order.status!=="FILLED"||Number(sold.order.realizedPnlKrw)!==26500)fail("SMOKE_CLOSE_FAILED");
+  const ledger=await c.query("SELECT delta,balance_after FROM hf_wallet_ledger WHERE user_id=$1 ORDER BY id",[userId]);
+  const wallet=await c.query("SELECT futures_balance FROM hf_wallets WHERE user_id=$1",[userId]);
+  if(ledger.rowCount!==2||Number(ledger.rows[0].delta)!==-1500||Number(ledger.rows[1].delta)!==26500||Number(wallet.rows[0].futures_balance)!==10025000)fail("SMOKE_LEDGER_FAILED");
+  const pos=await c.query("SELECT state FROM hf_futures_internal_positions WHERE id=$1",[opened.rows[0].id]);
+  if(pos.rows[0].state!=="CLOSED")fail("SMOKE_POSITION_NOT_CLOSED");
+  let blocked=false;
+  try{await executeInTransaction(c,userId,{...close,key:crypto.randomUUID()},quote(22001.25))}catch(e){blocked=e.code==="POSITION_NOT_OPEN";if(!blocked)throw e}
+  if(!blocked)fail("SMOKE_DOUBLE_CLOSE");
+  return {ok:true,rolledBack:true,orders:2,ledgerEntries:2,duplicateBlocked:true,doubleCloseBlocked:true};
+ }finally{await c.query("ROLLBACK").catch(()=>{});c.release()}
+}
+module.exports={ensure,route,state,input,checkQuote,execute,matchPending,executeInTransaction,rollbackSmoke};
