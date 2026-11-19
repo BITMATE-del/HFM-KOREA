@@ -20,7 +20,8 @@ const fail=(code)=>{const e=new Error(code);e.code=code;throw e};
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SYMBOL=/^\d{6}$/;
 function checkOrder(b){
- const symbol=String(b.symbol||""),side=String(b.side||"").toUpperCase(),qty=Number(b.qty),id=String(b.requestKey||b.clientOrderId||"");
+ const rawSymbol=String(b.symbol??"").trim(),symbol=/^[0-9]{1,6}$/.test(rawSymbol)?rawSymbol.padStart(6,"0"):rawSymbol;
+ const side=String(b.side||"").trim().toUpperCase(),qty=Number(b.qty),id=String(b.requestKey||b.clientOrderId||"").trim();
  if(!SYMBOL.test(symbol)||!["BUY","SELL"].includes(side)||!Number.isSafeInteger(qty)||qty<1||qty>100000||!UUID.test(id))fail("INVALID_STOCK_ORDER");
  return {symbol,side,qty,id};
 }
