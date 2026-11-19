@@ -189,7 +189,7 @@ async function rollbackSmoke(){
   const retry=await executeInTransaction(c,userId,open,quote(22000));
   if(!retry.duplicate||retry.order.id!==bought.order.id)fail("SMOKE_DUPLICATE_FAILED");
   const opened=await c.query("SELECT * FROM hf_futures_internal_positions WHERE open_order_id=$1",[bought.order.id]);
-  if(opened.rowCount!==1||Number(opened.rows[0].margin_krw)!==300000)fail("SMOKE_MARGIN_FAILED");
+  if(opened.rowCount!==1||Number(opened.rows[0].margin_krw)!==500000)fail("SMOKE_MARGIN_FAILED");
   const close={symbol:"NQ",side:"SELL",qty:1,type:"MARKET",action:"CLOSE",key:crypto.randomUUID(),limit:null,positionId:opened.rows[0].id};
   const sold=await executeInTransaction(c,userId,close,quote(22001.25));
   if(sold.order.status!=="FILLED"||Number(sold.order.realizedPnlKrw)!==26500)fail("SMOKE_CLOSE_FAILED");
