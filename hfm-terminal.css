@@ -248,3 +248,21 @@ button,input,select,textarea{font-family:inherit!important}
  #platform .trading-layout.stock-no-orderbook .order-fields{margin-bottom:10px!important}
  #platform .trading-layout.stock-no-orderbook .order-info{margin-bottom:10px!important}
 }
+
+/* Domestic stock buy/sell buttons — distinct, evenly spaced actions. */
+#platform .trading-layout.stock-no-orderbook .trade-buttons{
+ display:grid!important;
+ grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+ gap:12px!important;
+ margin-top:6px!important;
+}
+#platform .trading-layout.stock-no-orderbook .trade-buttons>button{
+ min-width:0!important;
+ min-height:48px!important;
+}
+@media(max-width:760px){
+ #platform .trading-layout.stock-no-orderbook .trade-buttons{
+  gap:12px!important;
+  margin-top:10px!important;
+ }
+}
