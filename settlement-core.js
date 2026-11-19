@@ -3,8 +3,8 @@
  * Contract sizing and fees are internal configurable policy values, not CME margin requirements.
  */
 const SPECS=Object.freeze({
- NQ:Object.freeze({tickUnits:25,scale:100,mult:20,marginKrw:3000000}),
- MNQ:Object.freeze({tickUnits:25,scale:100,mult:2,marginKrw:420000}),
+ NQ:Object.freeze({tickUnits:25,scale:100,mult:20,marginKrw:300000}),
+ MNQ:Object.freeze({tickUnits:25,scale:100,mult:2,marginKrw:30000}),
  ES:Object.freeze({tickUnits:25,scale:100,mult:50,marginKrw:2500000}),
  MES:Object.freeze({tickUnits:25,scale:100,mult:5,marginKrw:330000}),
  GC:Object.freeze({tickUnits:10,scale:100,mult:100,marginKrw:3500000}),
