@@ -44,3 +44,26 @@ test("workspace only talks to restricted preload methods",()=>{
  assert.match(preload,/contextBridge/);
  assert.doesNotMatch(preload,/exposeInMainWorld\(["']require/);
 });
+test("all HTS panes override the legacy WTS grid and suppress duplicate site controls",()=>{
+ const chart=paneCSS("chart"),order=paneCSS("order"),positions=paneCSS("positions");
+ for(const css of [chart,order,positions]){
+  assert.match(css,/html body #platform\.platform \.shell>#sidebar\.sidebar/);
+  assert.match(css,/html body #platform\.platform \.account-overview/);
+  assert.match(css,/html body #platform\.platform \.hfm-stock-tabs/);
+  assert.match(css,/grid-template-columns:none!important/);
+ }
+ assert.match(chart,/\.trading-layout>\.order-panel/);
+ assert.match(chart,/\.trading-layout>\.orderbook-panel/);
+ assert.match(order,/\.trading-layout>\.chart-panel/);
+ assert.match(order,/\.bottom-panel\{display:none!important\}/);
+ assert.match(positions,/\.trading-layout\{display:none!important\}/);
+ assert.match(positions,/\.bottom-panel\{display:block!important/);
+});
+test("workspace injects isolated styles after login and in detached windows",()=>{
+ const main=fs.readFileSync(path.join(__dirname,"../main.js"),"utf8");
+ assert.match(main,/async function enforcePane/);
+ assert.match(main,/hfm-hts-pane-css/);
+ assert.match(main,/contents\.insertCSS\(css\)/);
+ assert.match(main,/await enforcePane\(kind,wc\)/);
+ assert.match(main,/if\(current!==activePage\)navigatePane/);
+});
