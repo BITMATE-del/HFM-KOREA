@@ -187,8 +187,16 @@ function popout(kind){
  const wc=w.webContents;trustedNavigation(wc);
  wc.on("did-finish-load",async()=>{
   if(!isTrustedAppUrl(wc.getURL()))return;
-  try{await wc.insertCSS(paneCSS(kind));setTimeout(()=>wc.executeJavaScript(selectPageScript(activePage),true).catch(()=>{}),1100)}
-  catch(e){console.warn("HTS popout layout:",e.message)}
+  try{
+   await enforcePane(kind,wc);
+   setTimeout(async()=>{
+    if(wc.isDestroyed()||!isTrustedAppUrl(wc.getURL()))return;
+    await wc.executeJavaScript(selectPageScript(activePage),true).catch(()=>{});
+    await enforcePane(kind,wc);
+    if(activePage==="stocks"&&/^\\d{6}$/.test(activeSymbol))
+     await wc.executeJavaScript(selectSymbolScript(activeSymbol),true).catch(()=>{});
+   },1400);
+  }catch(e){console.warn("HTS popout layout:",e.message)}
  });
  wc.loadURL(HOME_URL).catch(()=>{});
 }
