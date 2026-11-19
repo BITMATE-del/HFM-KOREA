@@ -76,6 +76,38 @@ document.querySelectorAll("[data-mode]").forEach(button=>button.addEventListener
  else {selectedSymbol="NQ";renderSymbols();setTimeout(()=>window.hts.symbol("NQ","나스닥 100","CME"),500)}
 }));
 document.querySelectorAll("[data-popout]").forEach(b=>b.addEventListener("click",()=>window.hts.popout(b.dataset.popout)));
+const updatePanel=$("updatePanel"),updateButton=$("updateButton");
+const updateMessage=$("updateMessage"),updateProgress=$("updateProgress");
+const updateInstall=$("updateInstall"),updateLater=$("updateLater");
+let updateReady=false;
+function showUpdatePanel(value){
+ updatePanel.hidden=!value;updateButton.setAttribute("aria-expanded",String(!!value));
+}
+updateButton.addEventListener("click",()=>showUpdatePanel(updatePanel.hidden));
+$("updateCheck").addEventListener("click",()=>window.hts.updateCheck());
+updateLater.addEventListener("click",()=>showUpdatePanel(false));
+updateInstall.addEventListener("click",()=>{if(updateReady)window.hts.updateInstall()});
+window.hts.onUpdate?.(state=>{
+ if(!state||typeof state!=="object")return;
+ if(/^\\d+\\.\\d+\\.\\d+/.test(String(state.version||"")))
+  $("versionLabel").textContent="v"+state.version;
+ const current=state.version?("현재 v"+state.version):"";
+ const latest=state.latest?(" · 최신 v"+state.latest):"";
+ const captions={checking:"업데이트를 확인하고 있습니다.",available:"새 버전을 다운로드하고 있습니다.",
+  downloading:"업데이트 다운로드 중",downloaded:"다운로드가 완료됐습니다.",current:"최신 버전입니다.",
+  error:"업데이트 확인에 실패했습니다. 기존 프로그램은 계속 사용할 수 있습니다.",
+  unsupported:"이 버전은 수동 업데이트 방식입니다.",installing:"프로그램을 종료하고 업데이트를 적용합니다."};
+ const caption=captions[state.status]||"업데이트 상태를 확인할 수 없습니다.";
+ updateMessage.textContent=caption+(state.status==="error"&&state.message?" ("+String(state.message).slice(0,90)+")":"")+"\n"+current+latest;
+ updateReady=state.status==="downloaded";
+ updateProgress.hidden=state.status!=="downloading"&&state.status!=="downloaded";
+ updateProgress.value=Math.max(0,Math.min(100,Number(state.percent)||0));
+ updateInstall.hidden=!updateReady;
+ updateLater.hidden=!updateReady;
+ $("updateCheck").disabled=["checking","downloading","installing"].includes(state.status);
+ if(updateReady)showUpdatePanel(true);
+ if(state.status==="error")$("updateCheck").disabled=false;
+});
 $("refresh").addEventListener("click",()=>window.hts.refresh());
 $("preset").addEventListener("click",()=>{document.body.classList.toggle("compact");scheduleLayout();});
 $("symbolSearch").addEventListener("input",()=>{
