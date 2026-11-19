@@ -401,16 +401,18 @@ async function pullFuturesTop(id){
  try{
   const r=await fetch("/api/futures/top-of-book?product="+encodeURIComponent(id),{cache:"no-store",credentials:"same-origin"});
   const j=await r.json().catch(()=>({}));
-  futuresFeed.top[id]=r.ok&&j.available&&j.bid&&j.ask?j:null;
- }catch{futuresFeed.top[id]=null}
+  futuresFeed.top[id]=r.ok&&j.available&&j.bid&&j.ask?j:{available:false,reason:(!r.ok?(j.reason||j.error||"UNAVAILABLE"):(j.reason||(j.stale?"STALE":"NO_DATA")))};
+ }catch{futuresFeed.top[id]={available:false,reason:"NETWORK_ERROR"}}
  finally{futuresFeed.topPending.delete(id);
   if(session.on&&session.page==="futures"&&session.symbol===id)renderTopOfBook(id)}
 }
 function renderTopOfBook(id){
  const ask=$('#book-rows'),bid=$('#bid-rows');if(!ask||!bid)return;
  const s=getSym(id),top=futuresFeed.top[id];
- if(!top){
-  ask.innerHTML='<div class="stock-orderbook-empty">최우선 호가를 조회하고 있습니다.</div>';bid.replaceChildren();
+ if(!top?.available){
+  const reason=top?.reason;
+  const text=reason==="AUTH_OR_ENTITLEMENT"?"호가 데이터 이용 권한을 확인해 주세요.":reason==="STALE"?"최근 호가 갱신이 확인되지 않습니다.":reason?"현재 최우선 호가 데이터를 불러올 수 없습니다.":"최우선 호가를 조회하고 있습니다.";
+  ask.replaceChildren();const notice=document.createElement('div');notice.className='stock-orderbook-empty';notice.textContent=text;ask.appendChild(notice);bid.replaceChildren();
   
   
   return;
