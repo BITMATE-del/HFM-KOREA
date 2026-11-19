@@ -17,7 +17,7 @@
    if(![open,close,high,low,vol].every(Number.isFinite)||open<=0||close<=0||high<Math.max(open,close)||low>Math.min(open,close))continue;
    map.set(String(t),{time:t,open,close,high,low,vol});
   }
-  return [...map.values()].sort((a,b)=>String(a.time).localeCompare(String(b.time))).slice(-1200);
+  return [...map.values()].sort((a,b)=>String(a.time).localeCompare(String(b.time))).slice(-25000);
  }
  function average(data,n){
   let sum=0;
