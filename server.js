@@ -41,7 +41,7 @@ async function massiveFetch(path,params){
  if(massiveState.pending.has(id))return massiveState.pending.get(id);
  if(now<massiveState.nextAt)return {code:"COOLDOWN",ok:false,retryAfter:Math.ceil((massiveState.nextAt-now)/1000)};
  // Globally serialized across all check routes, leaving room under 5/minute.
- massiveState.nextAt=now+(process.env.MASSIVE_FUTURES_PAID==="true"?750:16000);
+ massiveState.nextAt=now+(process.env.MASSIVE_FUTURES_PAID==="true"?0:16000);
  const request=(async()=>{
   const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),7000);
   try{
