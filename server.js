@@ -7,6 +7,7 @@ const appApi=require("./app-api");
 const fundingApi=require("./funding-api");
 const tradingApi=require("./trading-api");
 const futuresInternal=require("./futures-internal-engine");
+const futuresLiveStream=require("./futures-live-stream");
 const memberAdmin=require("./member-admin-api");
 const stockDirectory=require("./stock-directory");
 const stockEngine=require("./stock-internal-engine");
@@ -242,6 +243,16 @@ async function stockCandles(code,period){
   return {symbol:code,period,source:"NAVER_MINUTE_LAST_PRICE",approximateOHLC:true,candles:bars.slice(-1200),asOf:new Date().toISOString()};
  });
 }
+const liveChartStream=futuresLiveStream.createBridge({
+ apiKey:process.env.MASSIVE_API_KEY,
+ enabled:process.env.MASSIVE_FUTURES_PAID==="true",
+ async getContract(product){
+  const date=new Date(Date.now()-8*60*60*1000).toISOString().slice(0,10);
+  const response=await massiveFetch("/futures/v1/contracts",{product_code:product,date,active:"true",type:"single",limit:"100",sort:"ticker.asc"});
+  if(!response.ok)throw Error(response.code||"CONTRACTS_UNAVAILABLE");
+  return chooseContract(response.results,product)?.ticker||"";
+ }
+});
 const host="0.0.0.0",port=Number(process.env.PORT||3000);
 http.createServer(async (req,res)=>{
  try{
@@ -252,6 +263,7 @@ http.createServer(async (req,res)=>{
   if(await tradingApi.route(req,res,url))return;
   if(await fundingApi.route(req,res,url))return;
   if(await appApi.route(req,res,url))return;
+  if(await liveChartStream.route(req,res,url,{auth:appApi.auth,allowedProducts:VALID_PRODUCTS}))return;
   if(url.pathname==="/api/stocks/catalog"){
    if(req.method!=="GET")return jsonResponse(res,405,{error:"METHOD_NOT_ALLOWED"});
    try{return jsonResponse(res,200,await stockDirectory.search(url.searchParams.get("q")||"",url.searchParams.get("page")||1))}
