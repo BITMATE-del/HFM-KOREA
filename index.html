@@ -13,7 +13,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .trading-layout.stock-no-orderbook .order-body{display:block}
 @media(max-width:1170px){.trading-layout.stock-no-orderbook{grid-template-columns:minmax(0,1fr) 260px}.trading-layout.stock-no-orderbook .order-panel{grid-column:2}}
 @media(max-width:680px){.trading-layout.stock-no-orderbook{grid-template-columns:minmax(0,1fr)}.trading-layout.stock-no-orderbook .chart-panel,.trading-layout.stock-no-orderbook .order-panel{grid-column:1}.trading-layout.stock-no-orderbook .order-body{display:grid}}
-</style><link rel="stylesheet" href="/hfm-terminal.css?v=20261119-stock-form-spacing2"><link rel="stylesheet" href="/hfm-market-chart.css?v=20261118c"><link rel="stylesheet" href="/hfm-stock-workspace.css?v=20261118e"><link rel="stylesheet" href="/hfm-watchlist.css?v=20261118e"><script src="/vendor/lightweight-charts.js?v=5.0.8" defer></script><script src="/hfm-market-chart.js?v=20261119-gc-zoom-fix" defer></script><link rel="stylesheet" href="/hfm-stocks.css?v=1"><style>
+</style><link rel="stylesheet" href="/hfm-terminal.css?v=20261119-stock-form-spacing2"><link rel="stylesheet" href="/hfm-market-chart.css?v=20261118c"><link rel="stylesheet" href="/hfm-stock-workspace.css?v=20261118e"><link rel="stylesheet" href="/hfm-watchlist.css?v=20261118e"><script src="/vendor/lightweight-charts.js?v=5.0.8" defer></script><script src="/hfm-market-chart.js?v=20261119-gc-zoom-fix" defer></script><script src="/futures-live-chart.js?v=20261120-live-trades-v1" defer></script><link rel="stylesheet" href="/hfm-stocks.css?v=1"><style>
 /* HFM KOREA member application: grouped, compact, mobile-friendly */
 #signup-form{gap:13px}
 #signup-form .signup-section-title{font-weight:800;font-size:14px;color:#173c7a;border-bottom:1px solid #dce5f2;padding:14px 0 8px;margin-top:6px;letter-spacing:-.3px}
@@ -85,6 +85,36 @@ const priceState=Object.fromEntries(symbols.map((s,i)=>[s.id,{price:s.price,base
 const stockFeed={quotes:Object.create(null),bars:Object.create(null),errors:Object.create(null),pending:new Set(),lastRequest:Object.create(null)};
 const futuresFeed={quotes:Object.create(null),bars:Object.create(null),pending:new Set(),historyPending:new Set(),historyView:Object.create(null),top:Object.create(null),topPending:new Set(),topLast:Object.create(null),displayDepth:Object.create(null),lastRequest:Object.create(null),errors:Object.create(null)};
 const futuresPeriods={"1분":"1min","5분":"5min","15분":"15min","1시간":"1hour","일봉":"1session"};
+const futuresLiveRecorder=()=>window.HFMFuturesChartLive?.createRecorder?.();
+let futuresChartRecorder=null,futuresChartTradePending=false;
+let futuresChartTradeStatus={product:"",ageSeconds:null,source:"",delayed:false};
+async function pullFuturesChartTrades(){
+ if(!session.on||session.page!=="futures"||document.hidden||futuresChartTradePending)return;
+ const id=session.symbol,period=futuresPeriods[session.tf]||"1min",key=id+"|"+period;
+ if(!["NQ","MNQ","ES","MES","GC","MGC","CL","MCL"].includes(id)||period==="1session")return;
+ if(!futuresFeed.bars[key]?.candles?.length)return;
+ futuresChartTradePending=true;
+ try{
+  const r=await fetch("/api/futures/chart-trades?product="+encodeURIComponent(id),{cache:"no-store",credentials:"same-origin",signal:AbortSignal.timeout(5500)});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||d.product!==id||!Array.isArray(d.trades))throw Error(d.error||"LIVE_CHART_FEED_UNAVAILABLE");
+  if(session.page!=="futures"||session.symbol!==id)return;
+  futuresChartTradeStatus={product:id,ageSeconds:d.ageSeconds,source:d.source,delayed:!!d.delayed};
+  if(d.delayed||d.ageSeconds===null||d.ageSeconds>15)return;
+  if(!futuresChartRecorder)futuresChartRecorder=futuresLiveRecorder();
+  if(!futuresChartRecorder)return;
+  const base=futuresFeed.bars[key];
+  if(base.contract&&d.contract&&base.contract!==d.contract)return;
+  const next=futuresChartRecorder.record({product:id,contract:d.contract,period,candles:base.candles,trades:d.trades,now:Date.now()});
+  if(next.changed){
+   futuresFeed.bars[key]={...base,candles:next.candles};
+   if(session.tf&&futuresPeriods[session.tf]===period&&!futuresFeed.historyView[key])drawChart();
+  }
+ }catch(error){
+  futuresChartTradeStatus={product:id,ageSeconds:null,source:"",delayed:true};
+ }finally{futuresChartTradePending=false}
+}
+
 async function pullFuturesMarket(id,tf="1분"){
  if(!["NQ","MNQ","ES","MES","GC","MGC","CL","MCL"].includes(id))return;
  const period=futuresPeriods[tf]||"1min",key=id+"|"+period;
@@ -96,7 +126,8 @@ async function pullFuturesMarket(id,tf="1분"){
   const result=await r.json().catch(()=>({}));
   if(!r.ok||result.product!==id||!Array.isArray(result.candles)||!result.candles.length||!(result.quote?.price>0))throw Error(result.error||"QUOTE_UNAVAILABLE");
   const cached=futuresFeed.bars[key];
-  const merged=new Map([...(cached?.candles||[]),...result.candles].map(bar=>[bar.time,bar]));
+  // Preserve recent real-trade updates while the slower aggregate API catches up.
+  const merged=new Map([...result.candles,...(cached?.candles||[]).filter(bar=>bar.livePartial&&Date.now()-bar.time*1000<180000)].map(bar=>[bar.time,bar]));
   futuresFeed.bars[key]={candles:[...merged.values()].sort((a,b)=>a.time-b.time).slice(-25000),source:result.source,contract:result.contract};
   const previous=futuresFeed.quotes[id];
   if(period==="1min"||!previous)futuresFeed.quotes[id]=result.quote;
@@ -718,7 +749,7 @@ window.HFMNavigateWatchSymbol=(code,label,market)=>{
 window.HFMCurrentWatchSymbol=()=>session.symbol;
 
 $$('.nav-item').forEach(b=>b.onclick=()=>setPage(b.dataset.page));$('#menu-toggle').onclick=()=>{session.menu=!session.menu;$('#sidebar').classList.toggle('open',session.menu)};$('#theme-button').onclick=toggleTheme;function toggleTheme(){session.dark=!session.dark;document.body.classList.toggle('dark',session.dark);$('#theme-button').innerHTML=session.dark?"<svg xmlns=\"http://www.w3.org/2000/svg\" aria-hidden=\"true\" viewBox=\"0 0 24 24\" width=\"19\" height=\"19\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41\"/></svg>":"<svg xmlns=\"http://www.w3.org/2000/svg\" aria-hidden=\"true\" viewBox=\"0 0 24 24\" width=\"19\" height=\"19\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20.4 15.4A8.5 8.5 0 0 1 8.6 3.6 8.5 8.5 0 1 0 20.4 15.4Z\"/></svg>";render()}
-$('#notification-button').onclick=()=>confirmModal('알림센터','<p>HFM KOREA 해외선물 이용 안내</p><p>해외선물 차트 시세는 Massive 제공 데이터를 사용하며, 내부 주문 체결 기능은 별도로 관리됩니다.</p>',()=>{});$('#dismiss-strip').onclick=()=>$('.notice-strip').classList.add('hidden');$('#sign-out').onclick=()=>confirmModal('로그아웃','로그아웃하시겠습니까?',async()=>{if(appState.user)await apiCall('/api/auth/logout','POST',{}).catch(()=>{});appState.user=null;session.on=false;$('#platform').classList.add('hidden');$('#auth').classList.remove('hidden');showAuth('login')});window.addEventListener('resize',()=>{if(session.on&&['futures','stocks'].includes(session.page))requestAnimationFrame(drawChart)});window.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#modal-root').innerHTML)$('#modal-root').innerHTML=''});if(new URLSearchParams(location.search).get('view')==='signup')showAuth('signup');restoreAccount();setInterval(marketTick,4500);setInterval(()=>{if(appState.user&&session.on&&!tradingState.pending&&Date.now()-tradingState.lastAt>30000)syncTradingState()},30000);setInterval(()=>{if(session.on&&session.page==='stocks')loadStockView()},15000);setInterval(()=>{if(session.on&&session.page==='futures')loadFuturesView()},20000);setInterval(()=>{if(session.on&&session.page==='futures')pullFuturesTop(session.symbol)},5500);setInterval(()=>{if(session.on&&session.page==='futures')refreshPositionPnL()},1000);setInterval(()=>{if(session.on&&session.page==='futures')renderTopOfBook(session.symbol)},850);save();
+$('#notification-button').onclick=()=>confirmModal('알림센터','<p>HFM KOREA 해외선물 이용 안내</p><p>해외선물 차트 시세는 Massive 제공 데이터를 사용하며, 내부 주문 체결 기능은 별도로 관리됩니다.</p>',()=>{});$('#dismiss-strip').onclick=()=>$('.notice-strip').classList.add('hidden');$('#sign-out').onclick=()=>confirmModal('로그아웃','로그아웃하시겠습니까?',async()=>{if(appState.user)await apiCall('/api/auth/logout','POST',{}).catch(()=>{});appState.user=null;session.on=false;$('#platform').classList.add('hidden');$('#auth').classList.remove('hidden');showAuth('login')});window.addEventListener('resize',()=>{if(session.on&&['futures','stocks'].includes(session.page))requestAnimationFrame(drawChart)});window.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#modal-root').innerHTML)$('#modal-root').innerHTML=''});if(new URLSearchParams(location.search).get('view')==='signup')showAuth('signup');restoreAccount();setInterval(marketTick,4500);setInterval(()=>{if(appState.user&&session.on&&!tradingState.pending&&Date.now()-tradingState.lastAt>30000)syncTradingState()},30000);setInterval(()=>{if(session.on&&session.page==='stocks')loadStockView()},15000);setInterval(()=>{if(session.on&&session.page==='futures')loadFuturesView()},20000);setInterval(pullFuturesChartTrades,4500);setInterval(()=>{if(session.on&&session.page==='futures')pullFuturesTop(session.symbol)},5500);setInterval(()=>{if(session.on&&session.page==='futures')refreshPositionPnL()},1000);setInterval(()=>{if(session.on&&session.page==='futures')renderTopOfBook(session.symbol)},850);save();
 })();
 
 </script><script src="/hfm-watchlist.js?v=20261118e" defer></script></body></html>
