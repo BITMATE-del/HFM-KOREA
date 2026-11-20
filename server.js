@@ -7,6 +7,7 @@ const appApi=require("./app-api");
 const fundingApi=require("./funding-api");
 const tradingApi=require("./trading-api");
 const futuresInternal=require("./futures-internal-engine");
+const futuresAutoLiquidation=require("./futures-auto-liquidation");
 const futuresLiveStream=require("./futures-live-stream");
 const memberAdmin=require("./member-admin-api");
 const stockDirectory=require("./stock-directory");
@@ -424,6 +425,19 @@ http.createServer(async (req,res)=>{
   fs.createReadStream(filepath).pipe(res)
  }catch(err){res.writeHead(400);res.end("Bad Request")}
 }).listen(port,host,()=>{console.log("HFM KOREA Futures web listening on "+port);
+const stopOutWorker=futuresAutoLiquidation.createWorker({
+ pool:appApi.pool,ensure:futuresInternal.ensure,quoteProvider:executionQuote
+});
+let stopOutBusy=false;
+setInterval(async()=>{
+ if(stopOutBusy||process.env.MASSIVE_FUTURES_PAID!=="true")return;
+ stopOutBusy=true;
+ try{
+  const state=await stopOutWorker.run();
+  if(state.liquidated)console.warn("FUTURES_STOP_OUT_COMPLETED",JSON.stringify(state));
+ }catch(error){console.warn("FUTURES_STOP_OUT_WORKER",String(error.code||error.message).slice(0,95))}
+ finally{stopOutBusy=false}
+},12000).unref();
 let pendingMatcherBusy=false;
 setInterval(async()=>{
  if(pendingMatcherBusy||process.env.MASSIVE_FUTURES_PAID!=="true")return;
