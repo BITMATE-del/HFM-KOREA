@@ -38,7 +38,7 @@ async function massiveFetch(path,params){
  if(!key)return {code:"MISSING_KEY",ok:false};
  const now=Date.now(),id=path+"?"+new URLSearchParams(params).toString();
  const cached=massiveState.cache.get(id);
- if(cached && now-cached.at<(path.startsWith("/futures/v1/quotes/")?4000:path.startsWith("/futures/v1/aggs/")?15000:180000))return cached.value;
+ if(cached && now-cached.at<(path.startsWith("/futures/v1/trades/")||path.startsWith("/futures/v1/quotes/")?3500:path.startsWith("/futures/v1/aggs/")?15000:180000))return cached.value;
  if(massiveState.pending.has(id))return massiveState.pending.get(id);
  if(now<massiveState.nextAt)return {code:"COOLDOWN",ok:false,retryAfter:Math.ceil((massiveState.nextAt-now)/1000)};
  // Globally serialized across all check routes, leaving room under 5/minute.
@@ -318,6 +318,35 @@ http.createServer(async (req,res)=>{
     stale:!fresh,asOf,ageSeconds,
     ...(fresh?{bid:{price:Number(item.bid_price),size:Number(item.bid_size)},
                ask:{price:Number(item.ask_price),size:Number(item.ask_size)}}:{})});
+  }
+  // Read-only live trade samples for the in-progress chart candle; not used for order execution.
+  if(url.pathname==="/api/futures/chart-trades"){
+   if(req.method!=="GET")return jsonResponse(res,405,{error:"METHOD_NOT_ALLOWED"});
+   const member=await appApi.auth(req);
+   if(!member)return jsonResponse(res,401,{error:"LOGIN_REQUIRED"});
+   const product=(url.searchParams.get("product")||"NQ").toUpperCase();
+   if(!VALID_PRODUCTS.has(product))return jsonResponse(res,400,{error:"INVALID_FUTURES_SYMBOL"});
+   if(process.env.MASSIVE_FUTURES_PAID!=="true")return jsonResponse(res,503,{error:"REALTIME_TRADE_FEED_DISABLED"});
+   const contractDate=new Date(Date.now()-8*60*60*1000).toISOString().slice(0,10);
+   const contracts=await massiveFetch("/futures/v1/contracts",{product_code:product,date:contractDate,active:"true",type:"single",limit:"100",sort:"ticker.asc"});
+   if(!contracts.ok)return jsonResponse(res,503,{error:"CONTRACTS_UNAVAILABLE",reason:contracts.code});
+   const chosen=chooseContract(contracts.results,product);
+   if(!chosen)return jsonResponse(res,404,{error:"NO_ACTIVE_CONTRACT"});
+   const output=await massiveFetch("/futures/v1/trades/"+encodeURIComponent(chosen.ticker),{sort:"timestamp.desc",limit:"200"});
+   if(!output.ok)return jsonResponse(res,503,{error:"CHART_TRADE_FEED_UNAVAILABLE",reason:output.code});
+   const now=Date.now(),trades=[];
+   for(const x of output.results){
+    const price=Number(x.price),size=Number(x.size||0);
+    let timestamp;try{timestamp=Number(BigInt(String(x.timestamp))/1000000n)}catch{continue}
+    if(!Number.isSafeInteger(timestamp)||timestamp>now+1000||timestamp<now-10*60*1000||
+      !Number.isFinite(price)||price<=0||!Number.isFinite(size)||size<0)continue;
+    trades.push({timestamp,price,size,sequence:String(x.sequence_number||x.report_sequence||"").slice(0,40)});
+   }
+   trades.sort((a,b)=>a.timestamp-b.timestamp||a.sequence.localeCompare(b.sequence));
+   const latest=trades.at(-1)?.timestamp||null;
+   const ageSeconds=latest===null?null:Math.max(0,Math.floor((now-latest)/1000));
+   return jsonResponse(res,200,{product,contract:chosen.ticker,source:"MASSIVE_FUTURES_TRADES",
+    delayed:ageSeconds===null||ageSeconds>15,ageSeconds,trades,updatedAt:new Date(now).toISOString()});
   }
   if(url.pathname==="/api/futures/market"){
    if(req.method!=="GET")return jsonResponse(res,405,{error:"METHOD_NOT_ALLOWED"});
