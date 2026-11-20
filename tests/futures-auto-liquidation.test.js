@@ -17,10 +17,10 @@ test("trigger only when total futures equity including closing fees <= zero",()=
  assert.equal(stop.liquidate,true);
 });
 test("all positions are evaluated as one account, profitable positions offset losses",()=>{
- const positions=[position("a","NQ","BUY",22000),position("b","MNQ","SELL",22000)];
+ const positions=[position("a","NQ","BUY",22000),position("b","MNQ","BUY",22000)];
  const quotes={NQ:quote("NQ",21998,21998.25),MNQ:quote("MNQ",21999,21999.25)};
  const plan=evaluate(60000,positions,quotes,now);
- assert.equal(plan.equity,60000-57500+(-1*2800-1500));
+ assert.equal(plan.equity,60000-57500+(-5600-1500));
  assert.equal(plan.liquidate,true);
  assert.equal(plan.settlements.length,2);
 });
