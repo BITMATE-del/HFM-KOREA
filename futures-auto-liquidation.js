@@ -57,7 +57,8 @@ async function settleAccount(pool,userId,quotes,{now=Date.now(),logger=console}=
   await c.query("UPDATE hf_futures_internal_orders SET status='CANCELLED',updated_at=NOW() WHERE user_id=$1 AND status='HELD' AND action='OPEN'",[userId]);
   const deficit=Math.max(0,-plan.equity);
   let balance=plan.balance;
-  for(const item of plan.settlements){
+  // Settle gains first so a temporary zero balance cannot hide gains or over-credit equity.
+  for(const item of [...plan.settlements].sort((a,b)=>b.netPnlKrw-a.netPnlKrw)){
    const p=item.position,orderId=crypto.randomUUID(),orderSide=p.side==="BUY"?"SELL":"BUY";
    const delta=Math.max(-balance,item.netPnlKrw);
    const uncollectible=Math.max(0,delta-item.netPnlKrw);
