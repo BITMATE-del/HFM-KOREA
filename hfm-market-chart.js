@@ -45,6 +45,22 @@
   const signature=[data.length,data[0]?.time,data.at(-1)?.time,data.at(-1)?.open,data.at(-1)?.high,data.at(-1)?.low,data.at(-1)?.close,data.at(-1)?.vol].join("|");
   const old=instances.get(el);
   if(old?.key===key && old?.signature===signature)return;
+  // Incremental live candle updates avoid rebuilding thousands of history bars every second.
+  if(old?.key===key && data.length && old.firstTime===data[0].time &&
+    (data.length===old.count||data.length===old.count+1) &&
+    (data.length===old.count?old.lastTime===data.at(-1).time:old.lastTime===data.at(-2).time)){
+   const last=data.at(-1),scale=old.chart.timeScale(),range=scale.getVisibleLogicalRange();
+   const atRight=!range||range.to>=old.count-12;
+   old.candles.update({time:last.time,open:last.open,high:last.high,low:last.low,close:last.close});
+   old.volume.update({time:last.time,value:last.vol,color:last.close>=last.open?"#ed768a":"#6d91e6"});
+   for(const [i,period] of [5,20,60].entries()){
+    const values=data.slice(-period),averageValue=values.reduce((sum,bar)=>sum+bar.close,0)/values.length;
+    old.lines[i].update({time:last.time,value:averageValue});
+   }
+   old.signature=signature;old.count=data.length;old.firstTime=data[0].time;old.lastTime=data.at(-1).time;old.lastTime=last.time;
+   if(atRight)scale.scrollToRealTime();
+   return;
+  }
   if(old?.key===key && data.length){
    const scale=old.chart.timeScale(),range=scale.getVisibleLogicalRange();
    const atRight=!range||range.to>=old.count-12;
@@ -100,7 +116,7 @@
     chart.applyOptions({width:Math.max(260,target.clientWidth),height:Math.max(290,target.clientHeight)});
    });
    observer.observe(target);
-   instances.set(el,{chart,observer,key,signature,count:data.length,candles,volume:vol,lines});
+   instances.set(el,{chart,observer,key,signature,count:data.length,firstTime:data[0].time,lastTime:data.at(-1).time,candles,volume:vol,lines});
   }catch(err){
    chart?.remove();
    console.warn("HFM_CHART_RENDER_FAILED",String(err?.message||"unavailable").slice(0,70));
