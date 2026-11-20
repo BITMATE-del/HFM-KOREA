@@ -42,7 +42,7 @@
   }
   const data=barsFor(series,stock);
   const key=[symbol,tf,dark?"dark":"light",source].join("|");
-  const signature=[data.length,data[0]?.time,data.at(-1)?.time,data.at(-1)?.close].join("|");
+  const signature=[data.length,data[0]?.time,data.at(-1)?.time,data.at(-1)?.open,data.at(-1)?.high,data.at(-1)?.low,data.at(-1)?.close,data.at(-1)?.vol].join("|");
   const old=instances.get(el);
   if(old?.key===key && old?.signature===signature)return;
   if(old?.key===key && data.length){
