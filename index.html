@@ -87,9 +87,46 @@ const futuresFeed={quotes:Object.create(null),bars:Object.create(null),pending:n
 const futuresPeriods={"1분":"1min","5분":"5min","15분":"15min","1시간":"1hour","일봉":"1session"};
 const futuresLiveRecorder=()=>window.HFMFuturesChartLive?.createRecorder?.();
 let futuresChartRecorder=null,futuresChartTradePending=false;
+let futuresStreamSource=null,futuresStreamProduct="",futuresStreamLastBar=0;
+function manageFuturesLiveStream(){
+ const active=session.on&&session.page==="futures"&&!document.hidden&&
+  ["NQ","MNQ","ES","MES","GC","MGC","CL","MCL"].includes(session.symbol);
+ const product=active?session.symbol:"";
+ if(futuresStreamSource&&futuresStreamProduct===product)return;
+ if(futuresStreamSource){futuresStreamSource.close();futuresStreamSource=null;futuresStreamProduct=""}
+ futuresStreamLastBar=0;
+ if(!product||typeof EventSource==="undefined")return;
+ const events=new EventSource("/api/futures/live?product="+encodeURIComponent(product));
+ futuresStreamSource=events;futuresStreamProduct=product;
+ events.addEventListener("bar",event=>{
+  if(futuresStreamSource!==events||session.page!=="futures"||session.symbol!==product)return;
+  let item;try{item=JSON.parse(event.data)}catch{return}
+  if(item.product!==product||item.source!=="MASSIVE_FUTURES_AGG_1SEC")return;
+  const period=futuresPeriods[session.tf]||"1min",key=product+"|"+period;
+  if(period==="1session")return;
+  const current=futuresFeed.bars[key];
+  if(!current?.candles?.length||(current.contract&&item.contract!==current.contract))return;
+  if(!futuresChartRecorder)futuresChartRecorder=futuresLiveRecorder();
+  if(!futuresChartRecorder)return;
+  const next=futuresChartRecorder.recordAggregate({
+   product,contract:item.contract,period,candles:current.candles,aggregate:item,now:Date.now()
+  });
+  if(!next.changed)return;
+  futuresStreamLastBar=Date.now();
+  futuresFeed.bars[key]={...current,candles:next.candles};
+  futuresChartTradeStatus={product,ageSeconds:Math.max(0,Math.floor((Date.now()-item.timestamp)/1000)),
+   source:item.source,delayed:false};
+  if(!futuresFeed.historyView[key])drawChart();
+ });
+ events.onerror=()=>{
+  if(futuresStreamSource===events)futuresStreamLastBar=0;
+  // EventSource automatically reconnects; REST trade samples remain available as fallback.
+ };
+}
+
 let futuresChartTradeStatus={product:"",ageSeconds:null,source:"",delayed:false};
 async function pullFuturesChartTrades(){
- if(!session.on||session.page!=="futures"||document.hidden||futuresChartTradePending)return;
+ if(!session.on||session.page!=="futures"||document.hidden||futuresChartTradePending||Date.now()-futuresStreamLastBar<12000)return;
  const id=session.symbol,period=futuresPeriods[session.tf]||"1min",key=id+"|"+period;
  if(!["NQ","MNQ","ES","MES","GC","MGC","CL","MCL"].includes(id)||period==="1session")return;
  if(!futuresFeed.bars[key]?.candles?.length)return;
@@ -749,7 +786,7 @@ window.HFMNavigateWatchSymbol=(code,label,market)=>{
 window.HFMCurrentWatchSymbol=()=>session.symbol;
 
 $$('.nav-item').forEach(b=>b.onclick=()=>setPage(b.dataset.page));$('#menu-toggle').onclick=()=>{session.menu=!session.menu;$('#sidebar').classList.toggle('open',session.menu)};$('#theme-button').onclick=toggleTheme;function toggleTheme(){session.dark=!session.dark;document.body.classList.toggle('dark',session.dark);$('#theme-button').innerHTML=session.dark?"<svg xmlns=\"http://www.w3.org/2000/svg\" aria-hidden=\"true\" viewBox=\"0 0 24 24\" width=\"19\" height=\"19\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41\"/></svg>":"<svg xmlns=\"http://www.w3.org/2000/svg\" aria-hidden=\"true\" viewBox=\"0 0 24 24\" width=\"19\" height=\"19\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20.4 15.4A8.5 8.5 0 0 1 8.6 3.6 8.5 8.5 0 1 0 20.4 15.4Z\"/></svg>";render()}
-$('#notification-button').onclick=()=>confirmModal('알림센터','<p>HFM KOREA 해외선물 이용 안내</p><p>해외선물 차트 시세는 Massive 제공 데이터를 사용하며, 내부 주문 체결 기능은 별도로 관리됩니다.</p>',()=>{});$('#dismiss-strip').onclick=()=>$('.notice-strip').classList.add('hidden');$('#sign-out').onclick=()=>confirmModal('로그아웃','로그아웃하시겠습니까?',async()=>{if(appState.user)await apiCall('/api/auth/logout','POST',{}).catch(()=>{});appState.user=null;session.on=false;$('#platform').classList.add('hidden');$('#auth').classList.remove('hidden');showAuth('login')});window.addEventListener('resize',()=>{if(session.on&&['futures','stocks'].includes(session.page))requestAnimationFrame(drawChart)});window.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#modal-root').innerHTML)$('#modal-root').innerHTML=''});if(new URLSearchParams(location.search).get('view')==='signup')showAuth('signup');restoreAccount();setInterval(marketTick,4500);setInterval(()=>{if(appState.user&&session.on&&!tradingState.pending&&Date.now()-tradingState.lastAt>30000)syncTradingState()},30000);setInterval(()=>{if(session.on&&session.page==='stocks')loadStockView()},15000);setInterval(()=>{if(session.on&&session.page==='futures')loadFuturesView()},20000);setInterval(pullFuturesChartTrades,4500);setInterval(()=>{if(session.on&&session.page==='futures')pullFuturesTop(session.symbol)},5500);setInterval(()=>{if(session.on&&session.page==='futures')refreshPositionPnL()},1000);setInterval(()=>{if(session.on&&session.page==='futures')renderTopOfBook(session.symbol)},850);save();
+$('#notification-button').onclick=()=>confirmModal('알림센터','<p>HFM KOREA 해외선물 이용 안내</p><p>해외선물 차트 시세는 Massive 제공 데이터를 사용하며, 내부 주문 체결 기능은 별도로 관리됩니다.</p>',()=>{});$('#dismiss-strip').onclick=()=>$('.notice-strip').classList.add('hidden');$('#sign-out').onclick=()=>confirmModal('로그아웃','로그아웃하시겠습니까?',async()=>{if(appState.user)await apiCall('/api/auth/logout','POST',{}).catch(()=>{});appState.user=null;session.on=false;$('#platform').classList.add('hidden');$('#auth').classList.remove('hidden');showAuth('login')});window.addEventListener('resize',()=>{if(session.on&&['futures','stocks'].includes(session.page))requestAnimationFrame(drawChart)});window.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#modal-root').innerHTML)$('#modal-root').innerHTML=''});if(new URLSearchParams(location.search).get('view')==='signup')showAuth('signup');restoreAccount();setInterval(marketTick,4500);setInterval(()=>{if(appState.user&&session.on&&!tradingState.pending&&Date.now()-tradingState.lastAt>30000)syncTradingState()},30000);setInterval(()=>{if(session.on&&session.page==='stocks')loadStockView()},15000);setInterval(()=>{if(session.on&&session.page==='futures')loadFuturesView()},20000);setInterval(pullFuturesChartTrades,4500);setInterval(manageFuturesLiveStream,1200);setInterval(()=>{if(session.on&&session.page==='futures')pullFuturesTop(session.symbol)},5500);setInterval(()=>{if(session.on&&session.page==='futures')refreshPositionPnL()},1000);setInterval(()=>{if(session.on&&session.page==='futures')renderTopOfBook(session.symbol)},850);save();
 })();
 
 </script><script src="/hfm-watchlist.js?v=20261118e" defer></script></body></html>
