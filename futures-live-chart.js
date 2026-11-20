@@ -49,7 +49,34 @@
    if(keys.size>3000){seen.set(product,new Set([...keys].slice(-1200)))}
    return {changed,candles:changed?result.slice(-25000):candles};
   }
-  return {record};
+  function recordAggregate({product,contract:nextContract,period,candles,aggregate,now=Date.now()}){
+   if(!Array.isArray(candles)||!candles.length||!PERIOD_SECONDS[period]||!aggregate)return {changed:false,candles};
+   if(contract!==nextContract){seen.clear();contract=nextContract}
+   const time=Number(aggregate.timestamp),open=Number(aggregate.open),high=Number(aggregate.high),
+    low=Number(aggregate.low),close=Number(aggregate.close),volume=Number(aggregate.volume);
+   if(!Number.isSafeInteger(time)||time<now-20000||time>now+1500||
+    ![open,high,low,close,volume].every(Number.isFinite)||open<=0||close<=0||
+    high<Math.max(open,close)||low>Math.min(open,close)||volume<0)return {changed:false,candles};
+   const keys=seen.get(product)||new Set();
+   if(!seen.has(product))seen.set(product,keys);
+   const key="sec:"+nextContract+":"+time;
+   if(keys.has(key))return {changed:false,candles};
+   const t=bucket(time,period),last=candles[candles.length-1];
+   if(t===null||t<last.time)return {changed:false,candles};
+   // Protect against mismatched vendor price scales or erroneous contract selection.
+   if(Number(last.close)>0&&(close/Number(last.close)>1.5||close/Number(last.close)<0.5))return {changed:false,candles};
+   keys.add(key);
+   if(keys.size>3000)seen.set(product,new Set([...keys].slice(-1200)));
+   const result=candles.slice();
+   if(t===last.time){
+    result[result.length-1]={...last,high:Math.max(last.high,high),low:Math.min(last.low,low),close,
+     volume:Math.max(0,Number(last.volume)||0)+(last.livePartial?volume:0),livePartial:true};
+   }else{
+    result.push({time:t,open,high,low,close,volume,livePartial:true});
+   }
+   return {changed:true,candles:result.slice(-25000)};
+  }
+  return {record,recordAggregate};
  }
  return {PERIOD_SECONDS,bucket,validTrade,createRecorder};
 });
