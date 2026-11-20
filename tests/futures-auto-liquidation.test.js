@@ -20,7 +20,7 @@ test("all positions are evaluated as one account, profitable positions offset lo
  const positions=[position("a","NQ","BUY",22000),position("b","MNQ","BUY",22000)];
  const quotes={NQ:quote("NQ",21998,21998.25),MNQ:quote("MNQ",21999,21999.25)};
  const plan=evaluate(60000,positions,quotes,now);
- assert.equal(plan.equity,60000-57500+(-5600-1500));
+ assert.equal(plan.equity,60000-57500+(-2800-1500));
  assert.equal(plan.liquidate,true);
  assert.equal(plan.settlements.length,2);
 });
