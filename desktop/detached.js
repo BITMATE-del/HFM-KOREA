@@ -15,7 +15,7 @@ window.panel.onState(state=>{
  document.getElementById("linked").hidden=state.kind==="positions";
  checkbox.checked=!!state.linked;
  if(state.symbol&&selector.querySelector('option[value="'+CSS.escape(state.symbol)+'"]'))selector.value=state.symbol;
- document.getElementById("shellNote").textContent=state.ready?"":"거래 서버 화면 연결 중입니다.";
+ document.getElementById("shellNote").textContent=state.ready?"":(state.kind==="order"?"주문하려면 로그인이 필요합니다. 상단의 메인창 버튼을 눌러 로그인해 주세요.":"이 기능을 이용하려면 메인 창에서 로그인해 주세요.");
  fit();
 });
 selector.addEventListener("change",()=>window.panel.choose(selector.value));
