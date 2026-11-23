@@ -640,13 +640,16 @@ function configureChartIndicators(){
   '<input type="checkbox" data-chart-option="'+key+'" '+(current[key]?'checked':'')+'>'+
   '<span>'+title+'</span></label>').join('')+
   '<small class="muted">시세·주문·체결에는 영향을 주지 않습니다. 표시 설정만 변경됩니다.</small></div>';
+ let next={...current};
  confirmModal('차트 지표 설정',body,()=>{
-  const next={...current};
-  for(const input of $('[data-chart-option]'))next[input.dataset.chartOption]=input.checked;
   try{localStorage.setItem(HFM_INDICATOR_KEY,JSON.stringify(next))}
   catch{toast('브라우저에 지표 설정을 저장하지 못했습니다.')}
   drawChart();
- },{confirmText:'적용'});
+ },{beforeConfirm:()=>{
+  next={...current};
+  for(const input of document.querySelectorAll('[data-chart-option]'))next[input.dataset.chartOption]=input.checked;
+  return true;
+ },confirmText:'적용'});
 }
 function drawChart(){
  const target=$('#hfm-market-chart');if(!target||!window.HFMMarketChart)return;
@@ -737,7 +740,7 @@ function closePosition(id){if(appState.user){const p=data.positions.find(x=>Stri
   try{const result=await apiCall('/api/futures/internal/order','POST',{action:'CLOSE',symbol:p.symbol,side:closeSide,qty:p.qty,type:'MARKET',positionId:p.id,requestKey});toast(result.duplicate?'이미 처리된 주문입니다.':'청산이 완료됐습니다.');syncTradingState()}
   catch(e){toast(({REFERENCE_QUOTE_STALE:'시세 갱신을 확인할 수 없습니다.',POSITION_NOT_OPEN:'이미 청산된 포지션입니다.',INSUFFICIENT_SETTLEMENT_BALANCE:'청산 정산 잔고가 부족합니다.'})[e.message]||'청산 실패: '+e.message)}
  },{trade:true,side:closeSide,confirmText:'청산하기'});return}const p=data.positions.find(x=>x.id===id);if(!p){toast('포지션이 존재하지 않습니다.');return}const s=getSym(p.symbol);confirmModal(s.kind==='stocks'?'보유주식 매도':'포지션 청산',`<p>${name(s)} · ${p.qty}${s.kind==='stocks'?'주':'계약'}</p><p>현재 시뮬레이션 가격 <strong>${shownPrice(price(p.symbol),s)}</strong></p>`,()=>{const px=price(p.symbol);const gross=(px-p.entry)*(p.side==='BUY'?1:-1)*p.qty*s.mult*(s.kind==='stocks'?1:1400);const fee=fees(p.symbol,p.qty);const pnl=gross-fee;if(s.kind==='stocks')data.stockCash+=px*p.qty-fee;else data.cash+=pnl;data.positions=data.positions.filter(x=>x.id!==id);data.transactions.push({id:++data.seq,type:'trade',kind:s.kind,symbol:s.id,amount:pnl,pnl,at:now()});data.transactions.push({id:++data.seq,type:'fee',kind:s.kind,symbol:s.id,amount:-fee,at:now()});save();render();toast('포지션이 청산되었습니다.')})}
-function confirmModal(title,body,action,options={}){const trade=options.trade===true;$('#modal-root').innerHTML=`<div class="modal-cover" id="cover"><div class="modal ${trade?'trade-confirm-modal':''}" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-head" id="modal-title">${title}<button class="icon-btn" id="modal-x" aria-label="닫기">×</button></div><div class="modal-body">${body}</div><div class="modal-actions"><button class="btn" id="modal-cancel">취소</button><button class="btn btn-primary ${trade?(options.side==='BUY'?'trade-ok-buy':'trade-ok-sell'):''}" id="modal-ok">${trade?(options.confirmText||'주문하기'):'확인'}</button></div></div></div>`;const shut=()=>$('#modal-root').innerHTML='';$('#modal-x').onclick=shut;$('#modal-cancel').onclick=shut;$('#modal-ok').onclick=()=>{if(options.beforeConfirm&&options.beforeConfirm()===false)return;action();shut()};$('#cover').onclick=e=>{if(e.target.id==='cover')shut()}}
+function confirmModal(title,body,action,options={}){const trade=options.trade===true;$('#modal-root').innerHTML=`<div class="modal-cover" id="cover"><div class="modal ${trade?'trade-confirm-modal':''}" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-head" id="modal-title">${title}<button class="icon-btn" id="modal-x" aria-label="닫기">×</button></div><div class="modal-body">${body}</div><div class="modal-actions"><button class="btn" id="modal-cancel">취소</button><button class="btn btn-primary ${trade?(options.side==='BUY'?'trade-ok-buy':'trade-ok-sell'):''}" id="modal-ok">${trade?(options.confirmText||'주문하기'):'확인'}</button></div></div></div>`;const shut=()=>$('#modal-root').innerHTML='';$('#modal-x').onclick=shut;$('#modal-cancel').onclick=shut;$('#modal-ok').onclick=()=>{if(options.beforeConfirm&&options.beforeConfirm()===false)return;shut();action()};$('#cover').onclick=e=>{if(e.target.id==='cover')shut()}}
 
 const quoteCatalog={query:null,page:1,items:[],total:0,loading:false,error:"",seq:0};
 function loadQuoteCatalog(query,page=1){
