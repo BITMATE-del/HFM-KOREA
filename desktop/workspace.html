@@ -35,7 +35,7 @@ body.compact #panes{grid-template-columns:minmax(0,1fr) 300px;grid-template-rows
 <header id="top">
  <div class="brand"><span class="logo">H</span><div><b>HFM KOREA</b><small>HTS TERMINAL</small></div></div>
  <div class="mode-buttons"><button data-mode="futures" class="active">해외선물</button><button data-mode="stocks">국내주식</button></div>
- <div class="top-end"><span id="versionLabel">v0.3.0</span><span class="status" id="connectState"><span class="dot"></span><span id="connectLabel">서버 연결 중</span></span><button id="updateButton" aria-expanded="false" type="button">업데이트</button><button id="refresh">새로고침</button><button id="preset">화면 정리</button></div>
+ <div class="top-end"><button id="newChart" type="button">+ 새 차트</button><button id="newOrder" type="button">주문창</button><button id="newPositions" type="button">포지션창</button><span id="versionLabel">v0.4.0</span><span class="status" id="connectState"><span class="dot"></span><span id="connectLabel">서버 연결 중</span></span><button id="updateButton" aria-expanded="false" type="button">업데이트</button><button id="refresh">새로고침</button><button id="preset">화면 정리</button></div>
 </header>
 <section id="surface">
  <div id="loginSurface"><div id="mainAuthNote">HFM KOREA 회원 계정으로 로그인하세요.</div></div>
@@ -45,9 +45,9 @@ body.compact #panes{grid-template-columns:minmax(0,1fr) 300px;grid-template-rows
    <div class="nav-footer">HFM KOREA HTS<br>해외선물 · 국내주식</div>
   </nav>
   <main id="panes">
-   <section class="pane" id="chartPane"><div class="pane-head"><b>차트 · 시세</b><small id="chartTitle">나스닥 100</small><button data-popout="chart">별도 창</button></div><div class="slot" id="chartSlot"></div></section>
-   <section class="pane" id="orderPane"><div class="pane-head"><b>주문</b><small>시장가 · 지정가</small><button data-popout="order">별도 창</button></div><div class="slot" id="orderSlot"></div></section>
-   <section class="pane" id="positionsPane"><div class="pane-head"><b>보유 포지션 · 미체결 · 체결 내역</b><button data-popout="positions">별도 창</button></div><div class="slot" id="positionsSlot"></div></section>
+   <section class="pane" id="chartPane"><div class="pane-head"><b>차트 · 시세</b><small id="chartTitle">나스닥 100</small><button data-popout="chart">새 차트창</button></div><div class="slot" id="chartSlot"></div></section>
+   <section class="pane" id="orderPane"><div class="pane-head"><b>주문</b><small>시장가 · 지정가</small><button data-popout="order">창 분리</button></div><div class="slot" id="orderSlot"></div></section>
+   <section class="pane" id="positionsPane"><div class="pane-head"><b>보유 포지션 · 미체결 · 체결 내역</b><button data-popout="positions">창 분리</button></div><div class="slot" id="positionsSlot"></div></section>
   </main>
  </div>
  <aside id="updatePanel" class="update-panel" hidden aria-live="polite">
