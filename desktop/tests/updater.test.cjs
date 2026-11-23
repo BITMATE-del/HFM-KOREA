@@ -42,3 +42,10 @@ test("updates never call new trading APIs, and never force quit while downloadin
  assert.match(src,/downloaded\|\|installing/);
  assert.match(src,/autoUpdater\.quitAndInstall\(false,true\)/);
 });
+
+test("manual update check opens the panel and newer-version events display download progress",()=>{
+ const ui=fs.readFileSync(path.join(__dirname,"../workspace.js"),"utf8");
+ assert.match(ui,/updateButton\.addEventListener\("click",\(\)=>\{showUpdatePanel\(true\);window\.hts\.updateCheck\(\)\}\)/);
+ assert.match(ui,/\["available","downloading","downloaded"\]\.includes\(state\.status\)\)showUpdatePanel\(true\)/);
+ assert.match(ui,/updateProgress\.value=Math\.max/);
+});
