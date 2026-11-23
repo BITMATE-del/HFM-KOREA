@@ -15,6 +15,7 @@ window.panel.onState(state=>{
  document.getElementById("linked").hidden=state.kind==="positions";
  checkbox.checked=!!state.linked;
  if(state.symbol&&selector.querySelector('option[value="'+CSS.escape(state.symbol)+'"]'))selector.value=state.symbol;
+ document.getElementById("authGate").hidden=!!state.ready;
  document.getElementById("shellNote").textContent=state.ready?"":(state.kind==="order"?"주문하려면 로그인이 필요합니다. 상단의 메인창 버튼을 눌러 로그인해 주세요.":"이 기능을 이용하려면 메인 창에서 로그인해 주세요.");
  fit();
 });
@@ -22,6 +23,7 @@ selector.addEventListener("change",()=>window.panel.choose(selector.value));
 checkbox.addEventListener("change",()=>window.panel.link(checkbox.checked));
 document.getElementById("refresh").addEventListener("click",()=>window.panel.refresh());
 document.getElementById("main").addEventListener("click",()=>window.panel.focusMain());
+document.getElementById("loginNow").addEventListener("click",()=>window.panel.focusMain());
 window.addEventListener("resize",fit);
 new ResizeObserver(fit).observe(slot);
 window.panel.ready();requestAnimationFrame(fit);
