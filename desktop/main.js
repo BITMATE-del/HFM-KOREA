@@ -268,7 +268,7 @@ function createDetached(kind,options={}){
  }});
  win.contentView.addChildView(child);child.setVisible(false);
  const id=win.webContents.id;
- const record={window:win,view:child,kind,page:options.page==="stocks"?"stocks":activePage,
+ const record={window:win,view:child,kind,page:options.page==="stocks"?"stocks":options.page==="futures"?"futures":activePage,
   symbol:SYMBOL.test(options.symbol||"")?options.symbol:activeSymbol,
   linked:options.linked!==false,rect:null};
  detached.set(id,record);popouts.add(win);
