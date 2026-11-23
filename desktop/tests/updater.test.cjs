@@ -21,7 +21,7 @@ test("release origin and semver strings are fixed and validated",()=>{
 });
 test("desktop package always includes CSS and Electron updater, excluding trading modules",()=>{
  const pkg=JSON.parse(fs.readFileSync(path.join(__dirname,"../package.json"),"utf8"));
- assert.equal(pkg.version,"0.3.0");
+ assert.equal(pkg.version,"0.4.0");
  assert.equal(pkg.build.appId,"kr.co.hfmkorea.hts");
  assert.ok(pkg.build.files.includes("hts-theme.css"));
  assert.ok(pkg.build.files.includes("updater.cjs"));
