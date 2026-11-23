@@ -4,6 +4,7 @@ const {app,BrowserWindow,WebContentsView,Menu,shell,dialog,session,screen,ipcMai
 const {HOME_URL,isTrustedAppUrl,isExternalAllowed}=require("./config.cjs");
 const {MODES,paneCSS,selectPageScript,selectSymbolScript}=require("./layout.cjs");
 const {initAutoUpdate}=require("./updater.cjs");
+const {createLayoutStore,normalizeRect,SYMBOL}=require("./layout-store.cjs");
 
 app.setAppUserModelId("kr.co.hfmkorea.hts");
 if(!app.requestSingleInstanceLock())app.quit();
@@ -11,6 +12,8 @@ if(!app.requestSingleInstanceLock())app.quit();
 let windowRef=null,authenticated=false,activePage="futures",activeSymbol="NQ",quitting=false;
 const panes=new Map(),positions={chart:null,order:null,positions:null};
 const popouts=new Set();
+const detached=new Map();
+let layoutStore=null,restoringPanels=false;
 let authTimer=null;
 let updaterControl={enabled:false};
 let promptedVersion="";
@@ -84,6 +87,12 @@ async function chooseSymbol(symbol,label="",market=""){
   if(view.webContents.isDestroyed()||!isTrustedAppUrl(view.webContents.getURL()))continue;
   try{await view.webContents.executeJavaScript(selectSymbolScript(symbol,label,market),true)}catch{}
  }
+ for(const record of detached.values()){
+  if(record.linked){
+   record.symbol=symbol;record.page=/^\\d{6}$/.test(symbol)?"stocks":activePage;
+   navigateDetached(record).catch(()=>{});
+  }
+ }
  send("hts:symbol-changed",{symbol,label});
 }
 async function onPaneLoaded(name,contents){
@@ -133,8 +142,13 @@ async function pollAuthentication(){
    if(authenticated){
     createPane("order");createPane("positions");
     for(const name of MODES)navigatePane(name,activePage);
+    restoreDetached();
    }
    applyBounds();
+  }
+  for(const record of detached.values()){
+   arrangeDetached(record);
+   tellDetached(record);
   }
   if(loggedIn){
    // Newly initialized views often finish account restoration after did-finish-load.
@@ -191,33 +205,105 @@ function loadWorkspace(){
  authTimer=setInterval(pollAuthentication,1800);
  createMenu();
 }
-function popout(kind){
- if(!MODES.includes(kind))return;
- const display=screen.getPrimaryDisplay().workAreaSize;
- const w=new BrowserWindow({
-  title:"HFM KOREA HTS · "+({chart:"차트",order:"주문",positions:"포지션"}[kind]),
-  width:kind==="chart"?Math.min(1100,display.width):kind==="order"?460:Math.min(1050,display.width),
-  height:kind==="chart"?Math.min(780,display.height):kind==="order"?780:460,
-  minWidth:kind==="chart"?660:kind==="order"?375:640,minHeight:340,
-  backgroundColor:"#f6f9fd",autoHideMenuBar:true,
-  webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,spellcheck:false}
+function detachedRecords(){
+ return [...detached.values()].filter(v=>!v.window.isDestroyed()).map(v=>({
+  kind:v.kind,symbol:v.symbol,page:v.page,linked:v.linked,rect:v.window.getBounds()
+ }));
+}
+function saveDetachedLayout(){
+ if(!layoutStore||restoringPanels)return;
+ try{layoutStore.save({panes:detachedRecords()})}catch(e){console.warn("HTS layout save:",e.message)}
+}
+function tellDetached(record){
+ if(record.window.isDestroyed()||record.window.webContents.isDestroyed())return;
+ record.window.webContents.send("hts:detached-state",{
+  kind:record.kind,linked:record.linked,symbol:record.symbol,page:record.page,ready:authenticated
  });
- popouts.add(w);w.on("closed",()=>popouts.delete(w));
- const wc=w.webContents;trustedNavigation(wc);
- wc.on("did-finish-load",async()=>{
+}
+function arrangeDetached(record){
+ if(record.window.isDestroyed()||record.view.webContents.isDestroyed())return;
+ const win=record.window,view=record.view;
+ if(!authenticated){view.setVisible(false);return}
+ const r=record.rect;
+ if(!r||r.width<50||r.height<50){view.setVisible(false);return}
+ const size=win.getContentBounds();
+ view.setBounds({x:Math.max(0,Math.min(r.x,size.width)),y:Math.max(0,Math.min(r.y,size.height)),
+  width:Math.max(0,Math.min(r.width,size.width-r.x)),
+  height:Math.max(0,Math.min(r.height,size.height-r.y))});
+ view.setVisible(true);
+}
+async function navigateDetached(record){
+ const wc=record.view.webContents;
+ if(wc.isDestroyed()||!isTrustedAppUrl(wc.getURL())||!authenticated)return;
+ await enforcePane(record.kind,wc);
+ await wc.executeJavaScript(selectPageScript(record.page),true).catch(()=>{});
+ // A symbol can be chosen independently per chart. Never fake or synthesize quote data.
+ if(SYMBOL.test(record.symbol)){
+  await wc.executeJavaScript(selectSymbolScript(record.symbol),true).catch(()=>{});
+ }
+ await enforcePane(record.kind,wc);
+ tellDetached(record);
+}
+function createDetached(kind,options={}){
+ if(!MODES.includes(kind)||!authenticated||detached.size>=12)return;
+ if(kind!=="chart"){
+  const existing=[...detached.values()].find(v=>v.kind===kind&&!v.window.isDestroyed());
+  if(existing){if(existing.window.isMinimized())existing.window.restore();existing.window.focus();return}
+ }
+ const display=screen.getPrimaryDisplay().workArea;
+ const preferred=normalizeRect(options.rect);
+ const defaults={chart:{width:900,height:640},order:{width:455,height:750},positions:{width:1000,height:440}}[kind];
+ const win=new BrowserWindow({
+  title:"HFM KOREA HTS · "+({chart:"차트",order:"주문·호가",positions:"보유 포지션"}[kind]),
+  width:preferred?.width||Math.min(defaults.width,display.width),
+  height:preferred?.height||Math.min(defaults.height,display.height),
+  ...(preferred?{x:preferred.x,y:preferred.y}:{}),
+  minWidth:kind==="order"?390:kind==="chart"?560:620,minHeight:kind==="positions"?270:390,
+  backgroundColor:"#eef2f7",show:false,autoHideMenuBar:true,
+  webPreferences:{preload:path.join(__dirname,"detached-preload.js"),nodeIntegration:false,
+   contextIsolation:true,sandbox:true,webSecurity:true,spellcheck:false}
+ });
+ const child=new WebContentsView({webPreferences:{
+  nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,spellcheck:false
+ }});
+ win.contentView.addChildView(child);child.setVisible(false);
+ const id=win.webContents.id;
+ const record={window:win,view:child,kind,page:options.page==="stocks"?"stocks":activePage,
+  symbol:SYMBOL.test(options.symbol||"")?options.symbol:activeSymbol,
+  linked:options.linked!==false,rect:null};
+ detached.set(id,record);popouts.add(win);
+ win.webContents.setWindowOpenHandler(()=>({action:"deny"}));
+ win.webContents.on("will-navigate",(event,url)=>{if(!url.startsWith("file://"))event.preventDefault()});
+ win.webContents.on("did-finish-load",()=>{tellDetached(record);arrangeDetached(record)});
+ win.once("ready-to-show",()=>{win.show();tellDetached(record)});
+ win.on("resize",()=>arrangeDetached(record));
+ win.on("move",saveDetachedLayout);
+ win.on("resized",saveDetachedLayout);
+ win.on("closed",()=>{
+  detached.delete(id);popouts.delete(win);
+  if(!child.webContents.isDestroyed())child.webContents.close();
+  if(!quitting)saveDetachedLayout();
+ });
+ const wc=child.webContents;
+ trustedNavigation(wc);
+ wc.on("did-finish-load",()=>{
   if(!isTrustedAppUrl(wc.getURL()))return;
-  try{
-   await enforcePane(kind,wc);
-   setTimeout(async()=>{
-    if(wc.isDestroyed()||!isTrustedAppUrl(wc.getURL()))return;
-    await wc.executeJavaScript(selectPageScript(activePage),true).catch(()=>{});
-    await enforcePane(kind,wc);
-    if(activePage==="stocks"&&/^\\d{6}$/.test(activeSymbol))
-     await wc.executeJavaScript(selectSymbolScript(activeSymbol),true).catch(()=>{});
-   },1400);
-  }catch(e){console.warn("HTS popout layout:",e.message)}
+  enforcePane(kind,wc).catch(()=>{});
+  setTimeout(()=>navigateDetached(record).catch(()=>{}),1200);
  });
+ wc.on("render-process-gone",()=>{if(!win.isDestroyed())win.setTitle("HFM KOREA HTS · 연결 확인 필요")});
+ win.loadFile(path.join(__dirname,"detached.html")).catch(console.error);
  wc.loadURL(HOME_URL).catch(()=>{});
+ if(!options.restoring)saveDetachedLayout();
+ return record;
+}
+function popout(kind){return createDetached(kind)}
+function restoreDetached(){
+ if(!authenticated||!layoutStore||restoringPanels||detached.size)return;
+ restoringPanels=true;
+ try{
+  for(const item of layoutStore.load().panes)createDetached(item.kind,{...item,restoring:true});
+ }finally{restoringPanels=false}
 }
 function createMenu(){
  const menu=Menu.buildFromTemplate([
@@ -246,10 +332,17 @@ function setPage(page){
  if(!["futures","stocks"].includes(page))return;
  activePage=page;
  for(const name of MODES)navigatePane(name,page);
+ for(const record of detached.values())if(record.linked){
+  record.page=page;
+  if(page==="futures"&&/^\\d{6}$/.test(record.symbol))record.symbol="NQ";
+  navigateDetached(record).catch(()=>{});
+ }
+
  send("hts:status",{message:page==="stocks"?"국내주식 HTS 작업공간":"해외선물 HTS 작업공간"});
 }
 function refreshPanes(){
  for(const pane of panes.values())if(!pane.webContents.isDestroyed())pane.webContents.loadURL(HOME_URL).catch(()=>{});
+ for(const record of detached.values())if(!record.view.webContents.isDestroyed())record.view.webContents.loadURL(HOME_URL).catch(()=>{});
 }
 function fromWorkspace(event){return !!windowRef&&!windowRef.isDestroyed()&&event.sender===windowRef.webContents}
 ipcMain.on("hts:layout",(event,rects)=>{
@@ -287,6 +380,32 @@ ipcMain.on("hts:update-install",e=>{if(fromWorkspace(e))updaterControl.install?.
 ipcMain.on("hts:refresh",e=>{if(fromWorkspace(e))refreshPanes()});
 ipcMain.on("hts:reconnect",e=>{if(fromWorkspace(e))refreshPanes()});
 ipcMain.on("hts:popout",(e,kind)=>{if(fromWorkspace(e))popout(kind)});
+function fromDetached(event){
+ const record=detached.get(event.sender.id);
+ return record&&record.window.webContents===event.sender&&!record.window.isDestroyed()?record:null;
+}
+ipcMain.on("hts:detached-ready",e=>{const r=fromDetached(e);if(r){tellDetached(r);arrangeDetached(r)}});
+ipcMain.on("hts:detached-layout",(e,rect)=>{
+ const r=fromDetached(e);if(!r||!rect)return;
+ const size=r.window.getContentBounds();
+ if(![rect.x,rect.y,rect.width,rect.height].every(Number.isInteger))return;
+ if(rect.x<0||rect.y<0||rect.width<0||rect.height<0||rect.x+rect.width>size.width+2||rect.y+rect.height>size.height+2)return;
+ r.rect=rect;arrangeDetached(r);
+});
+ipcMain.on("hts:detached-symbol",(e,symbol)=>{
+ const r=fromDetached(e);
+ if(!r||r.kind!=="chart"&&r.kind!=="order"||!SYMBOL.test(symbol))return;
+ r.symbol=symbol;r.page=/^\\d{6}$/.test(symbol)?"stocks":"futures";r.linked=false;
+ navigateDetached(r).catch(()=>{});tellDetached(r);saveDetachedLayout();
+});
+ipcMain.on("hts:detached-link",(e,linked)=>{
+ const r=fromDetached(e);if(!r||typeof linked!=="boolean")return;
+ r.linked=linked;if(linked){r.symbol=activeSymbol;r.page=activePage;navigateDetached(r).catch(()=>{})}
+ tellDetached(r);saveDetachedLayout();
+});
+ipcMain.on("hts:detached-refresh",e=>{const r=fromDetached(e);if(r&&!r.view.webContents.isDestroyed())r.view.webContents.loadURL(HOME_URL).catch(()=>{})});
+ipcMain.on("hts:detached-focus-main",e=>{if(fromDetached(e)&&windowRef&&!windowRef.isDestroyed()){windowRef.show();windowRef.focus()}});
+
 ipcMain.on("hts:preset",e=>{if(fromWorkspace(e))applyBounds()});
 
 app.on("second-instance",()=>{
@@ -294,8 +413,9 @@ app.on("second-instance",()=>{
  if(windowRef.isMinimized())windowRef.restore();
  windowRef.focus();
 });
-app.on("before-quit",()=>{quitting=true});
+app.on("before-quit",()=>{saveDetachedLayout();quitting=true});
 app.whenReady().then(()=>{
+ layoutStore=createLayoutStore(app.getPath("userData"));
  session.defaultSession.setPermissionRequestHandler((_wc,_permission,callback)=>callback(false));
  session.defaultSession.setPermissionCheckHandler(()=>false);
  loadWorkspace();
