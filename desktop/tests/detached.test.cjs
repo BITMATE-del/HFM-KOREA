@@ -55,6 +55,11 @@ test("native detached panel shells are bundled and sandboxed",()=>{
  const shell=fs.readFileSync(path.join(__dirname,"../detached.html"),"utf8");
  assert.match(shell,/id="panelSlot"/);
  assert.match(shell,/메인 종목 연동/);
+ assert.match(shell,/id="authGate"/);
+ assert.match(shell,/id="loginNow"/);
+ const renderer=fs.readFileSync(path.join(__dirname,"../detached.js"),"utf8");
+ assert.match(renderer,/authGate"\)\.hidden=!!state\.ready/);
+ assert.match(renderer,/loginNow"\)\.addEventListener/);
  const preload=fs.readFileSync(path.join(__dirname,"../detached-preload.js"),"utf8");
  assert.match(preload,/contextBridge\.exposeInMainWorld/);
  assert.doesNotMatch(preload,/require\("pg"\)|fetch\(.*api\/futures\/internal/);
