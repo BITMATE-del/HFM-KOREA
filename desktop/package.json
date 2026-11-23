@@ -1,6 +1,6 @@
 {
   "name": "hfm-korea-hts-desktop",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "HFM KOREA native multi-pane Windows HTS sharing the existing authenticated trading backend",
   "main": "main.js",
@@ -29,7 +29,11 @@
       "offline.html",
       "package.json",
       "updater.cjs",
-      "hts-theme.css"
+      "hts-theme.css",
+      "layout-store.cjs",
+      "detached.html",
+      "detached.js",
+      "detached-preload.js"
     ],
     "asar": true,
     "win": {
