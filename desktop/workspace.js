@@ -76,6 +76,7 @@ document.querySelectorAll("[data-mode]").forEach(button=>button.addEventListener
  else {selectedSymbol="NQ";renderSymbols();setTimeout(()=>window.hts.symbol("NQ","나스닥 100","CME"),500)}
 }));
 document.querySelectorAll("[data-popout]").forEach(b=>b.addEventListener("click",()=>window.hts.popout(b.dataset.popout)));
+for(const [id,kind] of [["newChart","chart"],["newOrder","order"],["newPositions","positions"]])document.getElementById(id)?.addEventListener("click",()=>window.hts.popout(kind));
 const updatePanel=$("updatePanel"),updateButton=$("updateButton");
 const updateMessage=$("updateMessage"),updateProgress=$("updateProgress");
 const updateInstall=$("updateInstall"),updateLater=$("updateLater");
