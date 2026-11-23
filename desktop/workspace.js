@@ -90,18 +90,22 @@ let updateReady=false;
 function showUpdatePanel(value){
  updatePanel.hidden=!value;updateButton.setAttribute("aria-expanded",String(!!value));
 }
-updateButton.addEventListener("click",()=>window.hts.updateCheck());
-$("updateCheck").addEventListener("click",()=>window.hts.updateCheck());
+updateButton.addEventListener("click",()=>{showUpdatePanel(true);window.hts.updateCheck()});
+$("updateCheck").addEventListener("click",()=>{showUpdatePanel(true);window.hts.updateCheck()});
 updateLater.addEventListener("click",()=>showUpdatePanel(false));
 updateInstall.addEventListener("click",()=>{if(updateReady)window.hts.updateInstall()});
 window.hts.onUpdate?.(state=>{
  if(!state||typeof state!=="object")return;
- if(typeof state.status==="string"){updateStatus=state.status;updateTopStatus();}
+ if(typeof state.status==="string"){
+  updateStatus=state.status;updateTopStatus();
+  // Show version comparison and download progress without interrupting trading.
+  if(["available","downloading","downloaded"].includes(state.status))showUpdatePanel(true);
+ }
  if(/^\\d+\\.\\d+\\.\\d+/.test(String(state.version||"")))
   $("versionLabel").textContent="v"+state.version;
  const current=state.version?("현재 v"+state.version):"";
  const latest=state.latest?(" · 최신 v"+state.latest):"";
- const captions={checking:"업데이트를 확인하고 있습니다.",available:"새 버전을 다운로드하고 있습니다.",
+ const captions={checking:"업데이트를 확인하고 있습니다.",available:"새 버전이 확인되어 자동으로 다운로드하고 있습니다.",
   downloading:"업데이트 다운로드 중",downloaded:"다운로드가 완료됐습니다.",current:"최신 버전입니다.",
   error:"업데이트 확인에 실패했습니다. 기존 프로그램은 계속 사용할 수 있습니다.",
   unsupported:"이 버전은 수동 업데이트 방식입니다.",installing:"프로그램을 종료하고 업데이트를 적용합니다."};
