@@ -12,6 +12,7 @@ button{cursor:pointer}button:hover{background:#29628f}
 #linked input{accent-color:#42a2ea}
 #shellNote{position:absolute;top:58px;left:12px;font-size:11px;color:#7890a5;pointer-events:none}
 #panelSlot{position:absolute;top:46px;bottom:0;left:0;right:0;background:#fff}
+#authGate{position:absolute;inset:46px 0 0;display:grid;place-items:center;background:#f8fafc;z-index:2;padding:20px;text-align:center}#authGate[hidden]{display:none}#authGate strong{display:block;font-size:16px;margin-bottom:10px}#authGate p{font-size:12px;color:#70839a;margin:0 0 17px;line-height:1.7}#loginNow{background:#216fa9;color:#fff;border:0;padding:10px 20px;font-size:12px}
 @media(max-width:560px){header{gap:4px;padding:0 6px}.brand{display:none}.controls{gap:4px}#symbol{width:72px}button,select{padding:6px 5px}#linked{font-size:10px;gap:2px}}
 </style></head><body>
 <header><span class="brand">HFM KOREA</span><span id="kindLabel">차트</span>
@@ -22,5 +23,5 @@ button{cursor:pointer}button:hover{background:#29628f}
 <option value="CL">CL · 원유</option><option value="MCL">MCL · 마이크로 원유</option>
 </select><label id="linked"><input type="checkbox" checked>메인 종목 연동</label>
 <button id="main" type="button">메인창</button><button id="refresh" type="button">새로고침</button>
-</div></header><div id="panelSlot"></div><span id="shellNote">거래 서버 연결 중입니다.</span>
+</div></header><div id="panelSlot"></div><div id="authGate" hidden><div><strong>로그인이 필요합니다</strong><p>주문과 계좌 정보를 이용하려면<br>HFM KOREA 회원 로그인을 진행해 주세요.</p><button id="loginNow" type="button">로그인하기</button></div></div><span id="shellNote">거래 서버 연결 중입니다.</span>
 <script src="./detached.js"></script></body></html>
