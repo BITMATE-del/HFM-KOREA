@@ -64,6 +64,6 @@ test("workspace injects isolated styles after login and in detached windows",()=
  assert.match(main,/async function enforcePane/);
  assert.match(main,/hfm-hts-pane-css/);
  assert.match(main,/contents\.insertCSS\(css\)/);
- assert.match(main,/await enforcePane\(kind,wc\)/);
+ assert.match(main,/await enforcePane\(record\.kind,wc\)/);
  assert.match(main,/if\(current!==activePage\)navigatePane/);
 });
