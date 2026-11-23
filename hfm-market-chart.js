@@ -26,6 +26,19 @@
    return {time:bar.time,value:sum/Math.min(i+1,n)}
   });
  }
+ function indicatorSettings(value){
+  const provider=global.HFMChartIndicators;
+  return provider?.sanitize?.(value)||{ma5:true,ma20:true,ma60:true,volume:true,bollinger:false};
+ }
+ function bollingerFor(data){
+  return global.HFMChartIndicators?.bollinger?.(data,20,2)||[];
+ }
+ function applyLastBand(bands,data){
+  if(!bands?.length)return;
+  const values=bollingerFor(data),last=values.at(-1);
+  if(!last)return;
+  for(const [key,line] of [["upper",bands[0]],["middle",bands[1]],["lower",bands[2]]])line.update({time:last.time,value:last[key]});
+ }
  function dispose(el){
   const old=instances.get(el);
   if(!old)return;
@@ -33,7 +46,7 @@
   old.chart?.remove();
   instances.delete(el);
  }
- function mount(el,{symbol,tf,dark=false,stock=false,series=[],source="",feedError=""}={}){
+ function mount(el,{symbol,tf,dark=false,stock=false,series=[],source="",feedError="",indicators}={}){
   if(!el)return;
   const library=global.LightweightCharts;
   if(!library?.createChart||!library.CandlestickSeries){
@@ -41,7 +54,8 @@
    return;
   }
   const data=barsFor(series,stock);
-  const key=[symbol,tf,dark?"dark":"light",source].join("|");
+  const options=indicatorSettings(indicators);
+  const key=[symbol,tf,dark?"dark":"light",source,JSON.stringify(options)].join("|");
   const signature=[data.length,data[0]?.time,data.at(-1)?.time,data.at(-1)?.open,data.at(-1)?.high,data.at(-1)?.low,data.at(-1)?.close,data.at(-1)?.vol].join("|");
   const old=instances.get(el);
   if(old?.key===key && old?.signature===signature)return;
@@ -57,6 +71,7 @@
     const values=data.slice(-period),averageValue=values.reduce((sum,bar)=>sum+bar.close,0)/values.length;
     old.lines[i].update({time:last.time,value:averageValue});
    }
+   applyLastBand(old.bands,data);
    old.signature=signature;old.count=data.length;old.firstTime=data[0].time;old.lastTime=data.at(-1).time;old.lastTime=last.time;
    if(atRight)scale.scrollToRealTime();
    return;
@@ -68,6 +83,7 @@
    old.candles.setData(candlesData);
    old.volume.setData(data.map(x=>({time:x.time,value:x.vol,color:x.close>=x.open?"#ed768a":"#6d91e6"})));
    for(const [i,period] of [5,20,60].entries())old.lines[i].setData(average(data,period));
+   if(old.bands?.length){const b=bollingerFor(data);for(const [key,line] of [["upper",old.bands[0]],["middle",old.bands[1]],["lower",old.bands[2]]])line.setData(b.map(v=>({time:v.time,value:v[key]})))}
    old.signature=signature;old.count=data.length;
    if(atRight)scale.scrollToRealTime();
    else if(range)scale.setVisibleLogicalRange(range);
@@ -99,13 +115,22 @@
    });
    const candles=chart.addSeries(library.CandlestickSeries,{upColor:colorUp,downColor:colorDown,borderUpColor:colorUp,borderDownColor:colorDown,wickUpColor:colorUp,wickDownColor:colorDown});
    candles.setData(data.map(x=>({time:x.time,open:x.open,high:x.high,low:x.low,close:x.close})));
-   const vol=chart.addSeries(library.HistogramSeries,{priceFormat:{type:"volume"},priceScaleId:"volume",lastValueVisible:false,priceLineVisible:false});
+   const vol=chart.addSeries(library.HistogramSeries,{priceFormat:{type:"volume"},priceScaleId:"volume",lastValueVisible:false,priceLineVisible:false,visible:options.volume});
    chart.priceScale("volume").applyOptions({scaleMargins:{top:.80,bottom:0}});
    vol.setData(data.map(x=>({time:x.time,value:x.vol,color:x.close>=x.open?"#ed768a":"#6d91e6"})));
    const lines=[];
-   for(const [period,color]of [[5,"#e1a54e"],[20,"#c85986"],[60,"#6379cc"]]){
-    const line=chart.addSeries(library.LineSeries,{color,lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+   for(const [period,color,enabled]of [[5,"#e1a54e",options.ma5],[20,"#c85986",options.ma20],[60,"#6379cc",options.ma60]]){
+    const line=chart.addSeries(library.LineSeries,{color,lineWidth:1,visible:enabled,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
     line.setData(average(data,period));lines.push(line);
+   }
+   const bands=[];
+   if(options.bollinger){
+    const values=bollingerFor(data);
+    for(const [key,color]of [["upper","#7c93b8"],["middle","#9aaabe"],["lower","#7c93b8"]]){
+     const line=chart.addSeries(library.LineSeries,{color,lineWidth:1,lineStyle:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+     line.setData(values.map(v=>({time:v.time,value:v[key]})));
+     bands.push(line);
+    }
    }
    // Open on readable recent candles rather than fitting thousands of history bars.
    const focusLatest=()=>chart.timeScale().setVisibleLogicalRange({from:Math.max(0,data.length-80),to:data.length+5});
@@ -116,7 +141,7 @@
     chart.applyOptions({width:Math.max(260,target.clientWidth),height:Math.max(290,target.clientHeight)});
    });
    observer.observe(target);
-   instances.set(el,{chart,observer,key,signature,count:data.length,firstTime:data[0].time,lastTime:data.at(-1).time,candles,volume:vol,lines});
+   instances.set(el,{chart,observer,key,signature,count:data.length,firstTime:data[0].time,lastTime:data.at(-1).time,candles,volume:vol,lines,bands});
   }catch(err){
    chart?.remove();
    console.warn("HFM_CHART_RENDER_FAILED",String(err?.message||"unavailable").slice(0,70));
