@@ -6,6 +6,13 @@ const symbols=[
  {code:"CL",name:"WTI 원유"},{code:"HSI",name:"항셍지수"}
 ];
 let signedIn=false,activePage="futures",selectedSymbol="NQ",pendingLayout=false;
+let updateStatus="checking";
+function updateTopStatus(){
+ const messages={checking:"업데이트 확인 중",current:"업데이트 최신버전",available:"새 버전 다운로드",downloading:"업데이트 다운로드 중",downloaded:"업데이트 준비 완료",installing:"업데이트 적용 중",unsupported:"수동 업데이트",error:"업데이트 확인 불가"};
+ $("connectLabel").textContent=messages[updateStatus]||"업데이트 확인 중";
+ $("connectState").classList.toggle("ready",updateStatus==="current");
+}
+
 let stockMatches=[],stockRequest=0,stockTimer=null;
 const $=id=>document.getElementById(id);
 function renderSymbols(){
@@ -59,8 +66,7 @@ function setSignedIn(value){
  signedIn=!!value;
  $("loginSurface").hidden=signedIn;
  $("dashboard").hidden=!signedIn;
- $("connectState").classList.toggle("ready",signedIn);
- $("connectLabel").textContent=signedIn?"거래 서버 연결됨":"회원 로그인 필요";
+ updateTopStatus();
  $("statusText").textContent=signedIn?"차트 · 주문 · 포지션 분리형 HTS":"HFM KOREA 거래 서버 연결";
  scheduleLayout();
 }
@@ -90,6 +96,7 @@ updateLater.addEventListener("click",()=>showUpdatePanel(false));
 updateInstall.addEventListener("click",()=>{if(updateReady)window.hts.updateInstall()});
 window.hts.onUpdate?.(state=>{
  if(!state||typeof state!=="object")return;
+ if(typeof state.status==="string"){updateStatus=state.status;updateTopStatus();}
  if(/^\\d+\\.\\d+\\.\\d+/.test(String(state.version||"")))
   $("versionLabel").textContent="v"+state.version;
  const current=state.version?("현재 v"+state.version):"";
@@ -136,4 +143,5 @@ window.hts.onStatus(s=>{
  if(s?.offline){$("connectState").classList.remove("ready");$("connectLabel").textContent="서버 재연결 필요";}
 });
 renderSymbols();
+updateTopStatus();
 scheduleLayout();
