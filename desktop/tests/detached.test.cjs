@@ -41,7 +41,7 @@ test("native detached panel shells are bundled and sandboxed",()=>{
  const pkg=JSON.parse(fs.readFileSync(path.join(__dirname,"../package.json"),"utf8"));
  for(const name of ["detached.html","detached.js","detached-preload.js","layout-store.cjs"])
   assert.ok(pkg.build.files.includes(name));
- assert.equal(pkg.version,"0.4.0");
+ assert.equal(pkg.version,"0.4.1");
  const main=fs.readFileSync(path.join(__dirname,"../main.js"),"utf8");
  assert.match(main,/new WebContentsView/);
  assert.match(main,/function createDetached/);
