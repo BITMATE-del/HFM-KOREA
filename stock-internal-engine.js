@@ -21,9 +21,12 @@ const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SYMBOL=/^\d{6}$/;
 function checkOrder(b){
  const rawSymbol=String(b.symbol??"").trim(),symbol=/^[0-9]{1,6}$/.test(rawSymbol)?rawSymbol.padStart(6,"0"):rawSymbol;
- const side=String(b.side||"").trim().toUpperCase(),qty=Number(b.qty),id=String(b.requestKey||b.clientOrderId||"").trim();
+ const side=String(b.side||"").trim().toUpperCase(),qty=Number(b.qty);
+ const keys=[b.requestKey,b.clientOrderId,b.id].filter(v=>v!==undefined&&v!==null&&v!=="").map(v=>String(v).trim());
+ const id=keys[0]||"";
+ if(keys.some(key=>key!==id))fail("INVALID_STOCK_ORDER");
  if(!SYMBOL.test(symbol)||!["BUY","SELL"].includes(side)||!Number.isSafeInteger(qty)||qty<1||qty>100000||!UUID.test(id))fail("INVALID_STOCK_ORDER");
- return {symbol,side,qty,id};
+ return {symbol,side,qty,id,requestKey:id};
 }
 function checkQuote(quote,now=Date.now()){
  const price=Number(quote?.price),asOf=Date.parse(quote?.asOf||"");
@@ -195,7 +198,7 @@ async function route(req,res,url,quoteProvider){
   const c=await pool.connect();
   try{
    await c.query("BEGIN");
-   const result=await transact(c,user.id,{symbol:o.symbol,side:o.side,qty:o.qty,requestKey:o.id},{...quote,tradeable:true});
+   const result=await transact(c,user.id,o,{...quote,tradeable:true});
    await c.query("COMMIT");
    send(res,200,{ok:true,executionMode:"INTERNAL_MARKET_REFERENCE",...result});return true;
   }catch(e){await c.query("ROLLBACK").catch(()=>{});throw e}finally{c.release()}
