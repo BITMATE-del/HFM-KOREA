@@ -34,7 +34,7 @@ function renderSymbols(){
  }
  if(!entries.length){
   const p=document.createElement("p");
-  p.textContent=activePage==="stocks"&&!q?"국내주식 종목명 또는 종목코드를 검색하세요.":activePage==="stocks"?"검색 결과가 없습니다.":"일치하는 종목이 없습니다.";
+  p.textContent=activePage==="stocks"&&!q?"종목 목록을 가져올 수 없습니다. 검색어를 입력해 다시 시도해 주세요.":activePage==="stocks"?"검색 결과가 없습니다.":"일치하는 종목이 없습니다.";
   p.style.cssText="font-size:12px;color:#8192aa;padding:10px;line-height:1.7";
   list.append(p);
  }
@@ -43,7 +43,7 @@ async function fetchStockMatches(){
  if(activePage!=="stocks"||!signedIn)return;
  const q=$("symbolSearch").value.trim();
  const seq=++stockRequest;
- if(!q){stockMatches=[];renderSymbols();return}
+ // Empty query deliberately loads the first catalog page.
  $("symbols").textContent="종목을 검색하고 있습니다...";
  try{
   const found=await window.hts.searchStocks(q);
@@ -63,7 +63,9 @@ function dispatchLayout(){
 }
 function scheduleLayout(){if(!pendingLayout){pendingLayout=true;requestAnimationFrame(dispatchLayout)}}
 function setSignedIn(value){
+ const wasSignedIn=signedIn;
  signedIn=!!value;
+ if(signedIn&&!wasSignedIn&&activePage==="stocks")fetchStockMatches();
  $("loginSurface").hidden=signedIn;
  $("dashboard").hidden=!signedIn;
  updateTopStatus();
@@ -78,7 +80,7 @@ document.querySelectorAll("[data-mode]").forEach(button=>button.addEventListener
  else $("chartTitle").textContent=symbols.find(s=>s.code===selectedSymbol)?.name||selectedSymbol;
  window.hts.page(activePage);
  $("symbolSearch").value="";
- if(activePage==="stocks"){selectedSymbol="";stockMatches=[];renderSymbols()}
+ if(activePage==="stocks"){selectedSymbol="";stockMatches=[];fetchStockMatches()}
  else {selectedSymbol="NQ";renderSymbols();setTimeout(()=>window.hts.symbol("NQ","나스닥 100","CME"),500)}
 }));
 document.querySelectorAll("[data-popout]").forEach(b=>b.addEventListener("click",()=>window.hts.popout(b.dataset.popout)));
