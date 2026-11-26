@@ -27,10 +27,19 @@ test("HFM average-cost accounting releases fractional cost conservatively",()=>{
 
 test("authenticated stock API forwards normalized requestKey to buy and sell execution",()=>{
  const source=require("node:fs").readFileSync(require("node:path").join(__dirname,"../stock-internal-engine.js"),"utf8");
- assert.match(source,/transact\(c,user\.id,\{symbol:o\.symbol,side:o\.side,qty:o\.qty,requestKey:o\.id\}/);
+ assert.match(source,/transact\(c,user\.id,o,\{\.\.\.quote,tradeable:true\}\)/);
  const requestKey="00000000-0000-4000-8000-000000000007";
  for(const side of ["BUY","SELL"]){
   const validated=checkOrder({symbol:"005930",side,qty:2,requestKey});
-  assert.deepEqual(checkOrder({symbol:validated.symbol,side:validated.side,qty:validated.qty,requestKey:validated.id}),validated);
+  assert.equal(validated.requestKey,requestKey);
+  assert.deepEqual(checkOrder(validated),validated);
+  assert.deepEqual(checkOrder({symbol:validated.symbol,side:validated.side,qty:validated.qty,id:validated.id}),validated);
  }
+});
+
+test("conflicting stock order keys and malformed orders are rejected without changing protections",()=>{
+ const key="00000000-0000-4000-8000-000000000007";
+ assert.throws(()=>checkOrder({symbol:"005930",side:"BUY",qty:2,requestKey:key,id:"00000000-0000-4000-8000-000000000008"}),/INVALID_STOCK_ORDER/);
+ assert.throws(()=>checkOrder({symbol:"005930",side:"SELL",qty:2,id:"invalid"}),/INVALID_STOCK_ORDER/);
+ assert.throws(()=>checkOrder({symbol:"005930",side:"SELL",qty:0,id:key}),/INVALID_STOCK_ORDER/);
 });
