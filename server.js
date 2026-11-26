@@ -428,13 +428,14 @@ http.createServer(async (req,res)=>{
 const stopOutWorker=futuresAutoLiquidation.createWorker({
  pool:appApi.pool,ensure:futuresInternal.ensure,quoteProvider:executionQuote
 });
-let stopOutBusy=false;
+let stopOutBusy=false,lastStopOutWarningAt=0;
 setInterval(async()=>{
  if(stopOutBusy||process.env.MASSIVE_FUTURES_PAID!=="true")return;
  stopOutBusy=true;
  try{
   const state=await stopOutWorker.run();
   if(state.liquidated)console.warn("FUTURES_STOP_OUT_COMPLETED",JSON.stringify(state));
+  if(state.skipped>0&&Date.now()-lastStopOutWarningAt>300000){lastStopOutWarningAt=Date.now();console.warn("FUTURES_STOP_OUT_UNVERIFIED_QUOTES",JSON.stringify({scanned:state.scanned,skipped:state.skipped}))}
  }catch(error){console.warn("FUTURES_STOP_OUT_WORKER",String(error.code||error.message).slice(0,95))}
  finally{stopOutBusy=false}
 },12000).unref();
