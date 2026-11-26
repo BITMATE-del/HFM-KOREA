@@ -43,3 +43,10 @@ test("desktop main and fallback are valid and hardened",()=>{
  assert.match(main,/requestSingleInstanceLock/);
  assert.match(offline,/다시 연결/);
 });
+
+test("native HTS session checks the server, not only a visible login surface",()=>{
+ const main=fs.readFileSync(path.join(__dirname,"../main.js"),"utf8");
+ assert.match(main,/fetch\('\/api\/auth\/me'/);
+ assert.match(main,/j\.authenticated===true/);
+ assert.doesNotMatch(main,/Boolean\(document\.querySelector\('#platform'\)/);
+});
