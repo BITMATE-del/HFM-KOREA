@@ -1,6 +1,6 @@
 {
   "name": "hfm-korea-hts-desktop",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "private": true,
   "description": "HFM KOREA native multi-pane Windows HTS sharing the existing authenticated trading backend",
   "main": "main.js",
