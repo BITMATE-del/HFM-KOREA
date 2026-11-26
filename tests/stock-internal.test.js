@@ -24,3 +24,13 @@ test("HFM average-cost accounting releases fractional cost conservatively",()=>{
  assert.equal(realizedCost("10","101005","10"),101005n);
  assert.throws(()=>realizedCost("6","60000","7"),/INSUFFICIENT_SHARES/);
 });
+
+test("authenticated stock API forwards normalized requestKey to buy and sell execution",()=>{
+ const source=require("node:fs").readFileSync(require("node:path").join(__dirname,"../stock-internal-engine.js"),"utf8");
+ assert.match(source,/transact\(c,user\.id,\{symbol:o\.symbol,side:o\.side,qty:o\.qty,requestKey:o\.id\}/);
+ const requestKey="00000000-0000-4000-8000-000000000007";
+ for(const side of ["BUY","SELL"]){
+  const validated=checkOrder({symbol:"005930",side,qty:2,requestKey});
+  assert.deepEqual(checkOrder({symbol:validated.symbol,side:validated.side,qty:validated.qty,requestKey:validated.id}),validated);
+ }
+});
