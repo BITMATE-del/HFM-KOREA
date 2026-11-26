@@ -194,7 +194,7 @@ async function stockQuote(code){
   const ts=Date.parse(rawTime);
   return {symbol:code,price,previousClose,change:price-previousClose,rate:(price-previousClose)/previousClose*100,
    asOf:Number.isFinite(ts)?new Date(ts).toISOString():null,marketStatus:stockMarketOpen()?"REGULAR_SESSION":"CLOSED",
-   source:"NAVER_UNOFFICIAL",tradeable:false};
+   source:"NAVER_UNOFFICIAL",tradeable:stockMarketOpen()&&Number.isFinite(ts)&&Date.now()-ts>=-5000&&Date.now()-ts<=60000};
  });
 }
 async function stockCandles(code,period){
