@@ -78,3 +78,25 @@ test("server executes stop-out only with licensed live quotes; no new external o
  assert.match(engine,/FUTURES_AUTO_LIQUIDATION/);
  assert.doesNotMatch(engine,/\/api\/futures\/internal\/order|\/api\/stocks\/internal/);
 });
+
+test("stop-out worker scans beyond the first 100 accounts without starving later users",async()=>{
+ const seen=[];
+ const pool={
+  async query(sql,args=[]){
+   if(sql.startsWith("SELECT DISTINCT user_id")){const rows=Array.from({length:101},(_,i)=>({user_id:String(i+1)})).filter(x=>BigInt(x.user_id)>BigInt(args[0])).slice(0,100);return {rowCount:rows.length,rows}}
+   if(sql.startsWith("SELECT DISTINCT symbol"))return{rowCount:0,rows:[]};
+   throw Error("UNEXPECTED_SQL");
+  },
+  async connect(){return{async query(sql,args=[]){
+   if(sql==="BEGIN"||sql==="ROLLBACK")return{rowCount:0,rows:[]};
+   if(sql.startsWith("SELECT futures_balance FROM hf_wallets")){seen.push(Number(args[0]));return{rowCount:0,rows:[]}}
+   throw Error("UNEXPECTED_SQL");
+  },release(){}}}
+ };
+ const worker=createWorker({pool,ensure:async()=>{},quoteProvider:async()=>null,logger:{warn(){},error(){}}});
+ const first=await worker.run(),second=await worker.run();
+ assert.equal(first.scanned,100);
+ assert.equal(second.scanned,1);
+ assert.equal(new Set(seen).size,101);
+ assert.ok(seen.includes(101));
+});
