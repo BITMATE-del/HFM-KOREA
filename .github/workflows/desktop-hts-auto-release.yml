@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - "desktop/package.json"
+      - ".github/workflows/desktop-hts-auto-release.yml"
 permissions:
   contents: write
 concurrency:
