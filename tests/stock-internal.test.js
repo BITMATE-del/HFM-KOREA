@@ -27,7 +27,8 @@ test("HFM average-cost accounting releases fractional cost conservatively",()=>{
 
 test("authenticated stock API forwards normalized requestKey to buy and sell execution",()=>{
  const source=require("node:fs").readFileSync(require("node:path").join(__dirname,"../stock-internal-engine.js"),"utf8");
- assert.match(source,/transact\(c,user\.id,o,\{\.\.\.quote,tradeable:true\}\)/);
+ assert.match(source,/transact\(c,user\.id,o,quote\)/);
+ assert.doesNotMatch(source,/transact\(c,user\.id,o,\{\.\.\.quote,tradeable:true\}\)/);
  const requestKey="00000000-0000-4000-8000-000000000007";
  for(const side of ["BUY","SELL"]){
   const validated=checkOrder({symbol:"005930",side,qty:2,requestKey});
