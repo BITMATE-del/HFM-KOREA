@@ -195,7 +195,7 @@ async function route(req,res,url,quoteProvider){
   const c=await pool.connect();
   try{
    await c.query("BEGIN");
-   const result=await transact(c,user.id,o,{...quote,tradeable:true});
+   const result=await transact(c,user.id,{symbol:o.symbol,side:o.side,qty:o.qty,requestKey:o.id},{...quote,tradeable:true});
    await c.query("COMMIT");
    send(res,200,{ok:true,executionMode:"INTERNAL_MARKET_REFERENCE",...result});return true;
   }catch(e){await c.query("ROLLBACK").catch(()=>{});throw e}finally{c.release()}
