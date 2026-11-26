@@ -135,7 +135,7 @@ async function pollAuthentication(){
  if(!chart||chart.webContents.isDestroyed()||!isTrustedAppUrl(chart.webContents.getURL()))return;
  try{
   const loggedIn=await chart.webContents.executeJavaScript(
-   "Boolean(document.querySelector('#platform')&&!document.querySelector('#platform').classList.contains('hidden'))",true);
+   "(async()=>{const p=document.querySelector('#platform');if(!p||p.classList.contains('hidden'))return false;try{const r=await fetch('/api/auth/me',{credentials:'same-origin',cache:'no-store'});if(!r.ok)return false;const j=await r.json();return j.authenticated===true}catch{return false}})()",true);
   if(loggedIn!==authenticated){
    authenticated=loggedIn;
    send("hts:auth",authenticated);
