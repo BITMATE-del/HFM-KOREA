@@ -154,7 +154,7 @@ async function rollbackSmoke(){
 async function rollbackLiveQuoteSmoke(provider){
  await ensure();
  const quote=await provider("005930");
- const verified=checkQuote({...quote,tradeable:true});
+ const verified=checkQuote(quote);
  const c=await pool.connect();
  try{
   await c.query("BEGIN");
@@ -162,7 +162,7 @@ async function rollbackLiveQuoteSmoke(provider){
   const userId=member.rows[0].id;
   await c.query("INSERT INTO hf_wallets(user_id,stocks_balance) VALUES($1,$2)",[userId,1000000000]);
   const key=crypto.randomUUID();
-  const buy=await transact(c,userId,{symbol:"005930",side:"BUY",qty:1,requestKey:key},{...quote,tradeable:true});
+  const buy=await transact(c,userId,{symbol:"005930",side:"BUY",qty:1,requestKey:key},quote);
   if(!buy.id||buy.priceKrw!==verified.price||buy.balanceKrw!==String(1000000000-verified.price))fail("LIVE_QUOTE_BUY_MISMATCH");
   const replay=await transact(c,userId,{symbol:"005930",side:"BUY",qty:1,requestKey:key},{...quote,tradeable:true});
   if(!replay.duplicate)fail("LIVE_QUOTE_RETRY_MISMATCH");
@@ -198,7 +198,7 @@ async function route(req,res,url,quoteProvider){
   const c=await pool.connect();
   try{
    await c.query("BEGIN");
-   const result=await transact(c,user.id,o,{...quote,tradeable:true});
+   const result=await transact(c,user.id,o,quote);
    await c.query("COMMIT");
    send(res,200,{ok:true,executionMode:"INTERNAL_MARKET_REFERENCE",...result});return true;
   }catch(e){await c.query("ROLLBACK").catch(()=>{});throw e}finally{c.release()}
