@@ -90,14 +90,19 @@ async function settleAccount(pool,userId,quotes,{now=Date.now(),logger=console}=
  }finally{c.release()}
 }
 function createWorker({pool,ensure,quoteProvider,logger=console}){
- let running=false;
+ let running=false,lastUserId="0";
  async function run(){
   if(running)return {status:"busy"};
   running=true;
   try{
    await ensure();
-   const users=await pool.query("SELECT DISTINCT user_id FROM hf_futures_internal_positions WHERE state='OPEN' ORDER BY user_id LIMIT 100");
+   let users=await pool.query("SELECT DISTINCT user_id FROM hf_futures_internal_positions WHERE state='OPEN' AND user_id>$1 ORDER BY user_id LIMIT 100",[lastUserId]);
+   if(!users.rowCount){
+    lastUserId="0";
+    users=await pool.query("SELECT DISTINCT user_id FROM hf_futures_internal_positions WHERE state='OPEN' AND user_id>$1 ORDER BY user_id LIMIT 100",[lastUserId]);
+   }
    if(!users.rowCount)return {status:"empty"};
+   lastUserId=String(users.rows[users.rows.length-1].user_id);
    const symbols=await pool.query("SELECT DISTINCT symbol FROM hf_futures_internal_positions WHERE state='OPEN' AND user_id=ANY($1::bigint[])",[users.rows.map(u=>u.user_id)]);
    const quotes={};
    // Upstream fetch deliberately serial; existing Massive provider limits are respected.
