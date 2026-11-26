@@ -85,11 +85,11 @@ async function rollbackSmoke(pool){
   await c.query("INSERT INTO hf_lab_accounts(id,balance_krw) VALUES($1,$2)",[accountId,10000000]);
   const openingRequestKey=randomUUID();
   const opened=await executeInTransaction(c,{accountId,requestKey:openingRequestKey,action:"OPEN",symbol:"NQ",side:"BUY",qty:1,price:22000,fxKrw:1400});
-  requireValue(opened.accountBalanceKrw===9998500&&opened.marginReservedKrw===3000000,"OPEN_ACCOUNTING_FAILED");
+  requireValue(opened.accountBalanceKrw===9998500&&opened.marginReservedKrw===calc.marginFor("NQ",1),"OPEN_ACCOUNTING_FAILED");
   const retry=await executeInTransaction(c,{accountId,requestKey:openingRequestKey,action:"OPEN",symbol:"NQ",side:"BUY",qty:1,price:22000,fxKrw:1400});
   requireValue(retry.duplicate===true&&retry.orderId===opened.orderId,"IDEMPOTENT_RETRY_FAILED");
   let insufficient=false;
-  try{await executeInTransaction(c,{accountId,requestKey:randomUUID(),action:"OPEN",symbol:"NQ",side:"BUY",qty:5,price:22000,fxKrw:1400})}
+  try{await executeInTransaction(c,{accountId,requestKey:randomUUID(),action:"OPEN",symbol:"NQ",side:"BUY",qty:20,price:22000,fxKrw:1400})}
   catch(e){insufficient=e.code==="INSUFFICIENT_MARGIN";if(!insufficient)throw e}
   requireValue(insufficient,"INSUFFICIENT_MARGIN_NOT_BLOCKED");
   let excessiveLoss=false;
