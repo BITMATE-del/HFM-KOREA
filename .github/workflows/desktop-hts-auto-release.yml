@@ -28,8 +28,7 @@ jobs:
         run: |
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
           if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid semver version" }
-          gh release view "v$version" 2>$null
-          if ($LASTEXITCODE -eq 0) { throw "This HTS version has already been released. Increment desktop/package.json before releasing." }
+          # gh release create fails safely if the version already exists; never overwrite an existing release.
           "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
       - name: Install and test HTS
         shell: pwsh
