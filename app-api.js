@@ -1,6 +1,6 @@
 "use strict";
 const {Pool}=require("pg");
-const {randomBytes,scrypt:rawScrypt,createHash,timingSafeEqual,createCipheriv}=require("node:crypto");
+const {randomBytes,scrypt:rawScrypt,createHash,createHmac,timingSafeEqual,createCipheriv}=require("node:crypto");
 const {promisify}=require("node:util");
 const scrypt=promisify(rawScrypt);
 function encryptAccount(value){
@@ -33,7 +33,8 @@ const tables=[
 "CREATE INDEX IF NOT EXISTS hf_notices_sort ON hf_notices(visible,pinned DESC,created_at DESC)",
 "CREATE TABLE IF NOT EXISTS hf_support(id BIGSERIAL PRIMARY KEY,user_id BIGINT NOT NULL REFERENCES hf_users(id) ON DELETE CASCADE,sender VARCHAR(12) NOT NULL CHECK(sender IN ('MEMBER','ADMIN')),message VARCHAR(3000) NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
 "CREATE INDEX IF NOT EXISTS hf_support_user ON hf_support(user_id,id)",
-"CREATE TABLE IF NOT EXISTS hf_audit(id BIGSERIAL PRIMARY KEY,actor_id BIGINT REFERENCES hf_users(id),action VARCHAR(80) NOT NULL,target VARCHAR(120),detail JSONB NOT NULL DEFAULT '{}'::jsonb,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())"
+"CREATE TABLE IF NOT EXISTS hf_audit(id BIGSERIAL PRIMARY KEY,actor_id BIGINT REFERENCES hf_users(id),action VARCHAR(80) NOT NULL,target VARCHAR(120),detail JSONB NOT NULL DEFAULT '{}'::jsonb,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
+"CREATE TABLE IF NOT EXISTS hf_admin_bootstrap_state(username VARCHAR(32) PRIMARY KEY, secret_fingerprint CHAR(64) NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())"
 ];
 async function passHash(pass){const salt=randomBytes(16).toString("hex"),hash=await scrypt(pass,salt,64);return "scrypt$"+salt+"$"+hash.toString("hex")}
 async function verify(pass,stored){try{const [alg,salt,hex]=stored.split("$");if(alg!=="scrypt"||!/^[a-f0-9]{128}$/.test(hex))return false;return timingSafeEqual(await scrypt(pass,salt,64),Buffer.from(hex,"hex"))}catch{return false}}
@@ -45,8 +46,28 @@ async function initialize(){
   for(const sql of tables)await c.query(sql);
   const id=String(process.env.HFM_BOOTSTRAP_ADMIN_ID||"").toLowerCase(),pwd=String(process.env.HFM_BOOTSTRAP_ADMIN_PASSWORD||"");
   if(/^[a-z0-9_]{4,32}$/.test(id)&&pwd.length>=16){
-   const row=await c.query("SELECT id FROM hf_users WHERE username=$1",[id]);
-   if(!row.rowCount){await c.query("INSERT INTO hf_users(username,password_hash,full_name,phone,role) VALUES($1,$2,'본사 관리자','미등록','ADMIN')",[id,await passHash(pwd)]);console.log("HFM_ADMIN_CREATED")}
+   const row=await c.query("SELECT id,role FROM hf_users WHERE username=$1 FOR UPDATE",[id]);
+   if(!row.rowCount){
+    const inserted=await c.query("INSERT INTO hf_users(username,password_hash,full_name,phone,role) VALUES($1,$2,'본사 관리자','미등록','ADMIN') RETURNING id",[id,await passHash(pwd)]);
+    const secretKey=String(process.env.HFM_ACCOUNT_ENCRYPTION_KEY||"");
+    if(/^[a-f0-9]{64}$/i.test(secretKey)){
+     const fingerprint=createHmac("sha256",Buffer.from(secretKey,"hex")).update(id+"\\0"+pwd).digest("hex");
+     await c.query("INSERT INTO hf_admin_bootstrap_state(username,secret_fingerprint) VALUES($1,$2)",[id,fingerprint]);
+    }
+    console.log("HFM_ADMIN_CREATED");
+   }else if(row.rows[0].role==="ADMIN"){
+    const secretKey=String(process.env.HFM_ACCOUNT_ENCRYPTION_KEY||"");
+    if(!/^[a-f0-9]{64}$/i.test(secretKey))throw Error("ADMIN_BOOTSTRAP_FINGERPRINT_KEY_MISSING");
+    const fingerprint=createHmac("sha256",Buffer.from(secretKey,"hex")).update(id+"\\0"+pwd).digest("hex");
+    const prior=await c.query("SELECT secret_fingerprint FROM hf_admin_bootstrap_state WHERE username=$1 FOR UPDATE",[id]);
+    if(!prior.rowCount||prior.rows[0].secret_fingerprint!==fingerprint){
+     await c.query("UPDATE hf_users SET password_hash=$1,updated_at=NOW() WHERE id=$2 AND role='ADMIN'",[await passHash(pwd),row.rows[0].id]);
+     await c.query("DELETE FROM hf_sessions WHERE user_id=$1",[row.rows[0].id]);
+     await c.query("INSERT INTO hf_admin_bootstrap_state(username,secret_fingerprint) VALUES($1,$2) ON CONFLICT(username) DO UPDATE SET secret_fingerprint=EXCLUDED.secret_fingerprint,updated_at=NOW()",[id,fingerprint]);
+     await c.query("INSERT INTO hf_audit(actor_id,action,target,detail) VALUES($1,'ADMIN_BOOTSTRAP_PASSWORD_RESET',$2,'{}'::jsonb)",[row.rows[0].id,id]);
+     console.log("HFM_ADMIN_PASSWORD_RESET");
+    }
+   }else console.warn("HFM_BOOTSTRAP_USERNAME_ROLE_CONFLICT");
   }
   await c.query("COMMIT");
  }catch(e){await c.query("ROLLBACK").catch(()=>{});throw e}finally{c.release()}
