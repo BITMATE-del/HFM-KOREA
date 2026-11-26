@@ -364,7 +364,7 @@ ipcMain.on("hts:symbol",(e,symbol,label="",market="")=>{
 ipcMain.handle("hts:search-stocks",async(e,query)=>{
  if(!fromWorkspace(e)||!authenticated||typeof query!=="string")return [];
  const q=query.trim().slice(0,50);
- if(!q)return [];
+ // Empty search returns the first catalog page rather than an empty watchlist.
  const view=panes.get("chart");
  if(!view||view.webContents.isDestroyed()||!isTrustedAppUrl(view.webContents.getURL()))return [];
  try{
